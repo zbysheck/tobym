@@ -7,7 +7,22 @@ DOMAIN=tobym.zbigniewkisly.usermd.net
 REPO=git@github.com:zbysheck/tobym.git
 KEY=$HOME/.ssh/tobym_deploy
 DIR=$HOME/domains/$DOMAIN
-COMPOSER=/usr/local/bin/composer2
+# Znajduje Composera 2 (na MyDevil bywa pod roznymi nazwami); w ostatecznosci pobiera composer.phar.
+find_composer() {
+    local c
+    for c in composer2 composer /usr/local/bin/composer2 /usr/local/bin/composer "$HOME/bin/composer"; do
+        if command -v "$c" >/dev/null 2>&1 && "$c" --version 2>/dev/null | grep -Eq 'version 2\.'; then
+            echo "$c"
+            return
+        fi
+    done
+    mkdir -p "$HOME/bin"
+    if [ ! -f "$HOME/bin/composer.phar" ]; then
+        php -r 'copy("https://getcomposer.org/download/latest-2.x/composer.phar", getenv("HOME")."/bin/composer.phar") || exit(1);' >&2 || return 1
+    fi
+    echo "php $HOME/bin/composer.phar"
+}
+COMPOSER=$(find_composer)
 
 echo "== 1/6 Strona WWW =="
 if [ ! -d "$DIR" ]; then
@@ -21,14 +36,17 @@ echo "== 2/6 Klucz do repozytorium =="
 mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
 [ -f "$KEY" ] || ssh-keygen -q -t ed25519 -f "$KEY" -N "" -C tobym-deploy
 export GIT_SSH_COMMAND="ssh -i $KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
-if [ ! -d "$DIR/app/.git" ] && ! git ls-remote "$REPO" >/dev/null 2>&1; then
-    echo
-    echo "Dodaj ten klucz na GitHubie: repo tobym > Settings > Deploy keys > Add deploy key"
-    echo "(bez zaznaczania 'Allow write access'):"
-    echo
-    cat "$KEY.pub"
-    echo
-    read -r -p "Nacisnij Enter, gdy klucz bedzie dodany... "
+if [ ! -d "$DIR/app/.git" ]; then
+    until git ls-remote "$REPO" >/dev/null 2>&1; do
+        echo
+        echo "GitHub nie przyjmuje jeszcze klucza. Dodaj go: repo tobym > Settings > Deploy keys > Add deploy key"
+        echo "(bez zaznaczania 'Allow write access'). Wklej cala linie ponizej:"
+        echo
+        cat "$KEY.pub"
+        echo
+        read -r -p "Nacisnij Enter, gdy klucz bedzie dodany (Ctrl+C przerywa)... "
+    done
+    echo "Klucz dziala."
 fi
 
 echo "== 3/6 Kod =="
@@ -43,7 +61,7 @@ devil www options "$DOMAIN" php_openbasedir "$DIR/app/"
 
 echo "== 4/6 Zaleznosci PHP =="
 cd "$DIR/app"
-"$COMPOSER" install --no-dev --optimize-autoloader --no-interaction
+$COMPOSER install --no-dev --optimize-autoloader --no-interaction
 
 echo "== 5/6 Plik .env =="
 if [ ! -f .env ]; then
