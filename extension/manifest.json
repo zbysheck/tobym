@@ -1,0 +1,11 @@
+{
+    "manifest_version": 3,
+    "name": "Tobym",
+    "description": "Dodaj prezent do swojej wishlisty z dowolnej strony.",
+    "version": "0.0.1",
+    "action": {
+        "default_title": "Tobym",
+        "default_popup": "popup.html"
+    },
+    "permissions": ["activeTab"]
+}
