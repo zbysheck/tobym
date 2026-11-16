@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Layout;
 use App\Enums\Theme;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -15,10 +16,11 @@ use Illuminate\Support\Carbon;
  * @property string|null $draft_token
  * @property string $title
  * @property Theme $theme
+ * @property Layout $layout
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'draft_token', 'title', 'theme'])]
+#[Fillable(['user_id', 'draft_token', 'title', 'theme', 'layout'])]
 class Wishlist extends Model
 {
     public const DEFAULT_TITLE = 'Moja lista';
@@ -46,6 +48,7 @@ class Wishlist extends Model
     {
         return [
             'theme' => Theme::class,
+            'layout' => Layout::class,
         ];
     }
 }

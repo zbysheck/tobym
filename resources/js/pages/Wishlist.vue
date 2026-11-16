@@ -1,12 +1,35 @@
 <script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
-import type { ThemeOption, WishlistData, WishlistItem } from '@/types';
+import AddGiftDialog from '@/components/AddGiftDialog.vue';
+import GiftItem from '@/components/GiftItem.vue';
+import type {
+    GiftPreview,
+    ThemeOption,
+    WishlistData,
+    WishlistItem,
+    WishlistLayout,
+} from '@/types';
+
+type SortKey = 'added' | 'newest' | 'price-asc' | 'price-desc' | 'name';
 
 const props = defineProps<{
     wishlist: WishlistData;
     themes: ThemeOption[];
 }>();
+
+const sortOptions: { value: SortKey; label: string }[] = [
+    { value: 'added', label: 'Kolejność dodania' },
+    { value: 'newest', label: 'Najnowsze' },
+    { value: 'price-asc', label: 'Cena: od najniższej' },
+    { value: 'price-desc', label: 'Cena: od najwyższej' },
+    { value: 'name', label: 'Nazwa: A–Z' },
+];
+
+const layoutOptions: { value: WishlistLayout; label: string }[] = [
+    { value: 'tiles', label: 'Kafelki' },
+    { value: 'rows', label: 'Rzędy' },
+];
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
@@ -14,17 +37,80 @@ const status = computed(() => page.props.flash.status);
 const errors = computed(() => page.props.errors);
 
 const theme = ref(props.wishlist.theme);
+const layout = ref<WishlistLayout>(props.wishlist.layout);
 watch(
-    () => props.wishlist.theme,
-    (value) => {
-        theme.value = value;
+    () => [props.wishlist.theme, props.wishlist.layout] as const,
+    ([nextTheme, nextLayout]) => {
+        theme.value = nextTheme;
+        layout.value = nextLayout;
     },
 );
 
 const url = ref('');
-const adding = ref(false);
+const urlError = ref('');
+const loadingPreview = ref(false);
+const preview = ref<GiftPreview | null>(null);
+const savingGift = ref(false);
+
 const email = ref('');
 const sending = ref(false);
+
+const search = ref('');
+const sort = ref<SortKey>('added');
+const shop = ref('');
+
+const shops = computed(() =>
+    [
+        ...new Set(
+            props.wishlist.items
+                .map((item) => item.shop)
+                .filter((name): name is string => name !== null),
+        ),
+    ].sort((a, b) => a.localeCompare(b, 'pl')),
+);
+
+function priceValue(item: WishlistItem): number | null {
+    const match = /\d+(?:\.\d+)?/.exec(
+        (item.price ?? '').replace(/[\s ]/g, '').replace(',', '.'),
+    );
+
+    return match ? Number(match[0]) : null;
+}
+
+function byPrice(direction: 1 | -1) {
+    return (a: WishlistItem, b: WishlistItem): number => {
+        const first = priceValue(a);
+        const second = priceValue(b);
+
+        if (first === null || second === null) {
+            return first === second ? 0 : first === null ? 1 : -1;
+        }
+
+        return (first - second) * direction;
+    };
+}
+
+const visibleItems = computed(() => {
+    const phrase = search.value.trim().toLowerCase();
+    const items = props.wishlist.items.filter(
+        (item) =>
+            (shop.value === '' || item.shop === shop.value) &&
+            (phrase === '' || item.title.toLowerCase().includes(phrase)),
+    );
+
+    switch (sort.value) {
+        case 'newest':
+            return items.reverse();
+        case 'price-asc':
+            return items.sort(byPrice(1));
+        case 'price-desc':
+            return items.sort(byPrice(-1));
+        case 'name':
+            return items.sort((a, b) => a.title.localeCompare(b.title, 'pl'));
+        default:
+            return items;
+    }
+});
 
 const countLabel = computed(() => {
     const count = props.wishlist.items.length;
@@ -46,33 +132,98 @@ const countLabel = computed(() => {
     return `${count} prezentów na liście`;
 });
 
-function inputValue(event: Event): string {
-    return (event.target as HTMLInputElement).value.trim();
+function xsrfToken(): string {
+    const match = /(?:^|; )XSRF-TOKEN=([^;]+)/.exec(document.cookie);
+
+    return match ? decodeURIComponent(match[1]) : '';
 }
 
-function addItem(): void {
-    if (url.value.trim() === '' || adding.value) {
+async function requestPreview(): Promise<void> {
+    const link = url.value.trim();
+
+    if (link === '' || loadingPreview.value) {
         return;
     }
 
-    adding.value = true;
+    loadingPreview.value = true;
+    urlError.value = '';
+
+    try {
+        const response = await fetch('/items/preview', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-XSRF-TOKEN': xsrfToken(),
+            },
+            body: JSON.stringify({ url: link }),
+        });
+
+        if (response.status === 422) {
+            const body = (await response.json()) as {
+                errors?: Record<string, string[]>;
+            };
+            urlError.value =
+                body.errors?.url?.[0] ?? 'Nie udało się odczytać linku.';
+
+            return;
+        }
+
+        if (!response.ok) {
+            urlError.value =
+                'Nie udało się pobrać danych. Odśwież stronę i spróbuj ponownie.';
+
+            return;
+        }
+
+        preview.value = (await response.json()) as GiftPreview;
+    } catch {
+        urlError.value = 'Brak połączenia. Spróbuj ponownie.';
+    } finally {
+        loadingPreview.value = false;
+    }
+}
+
+function submitLink(): void {
+    void requestPreview();
+}
+
+function confirmGift(details: { title: string; price: string }): void {
+    const current = preview.value;
+
+    if (current === null) {
+        return;
+    }
+
+    savingGift.value = true;
     router.post(
         '/items',
-        { url: url.value.trim() },
+        {
+            url: current.url,
+            title: details.title,
+            price: details.price,
+            shop: current.shop,
+            image_url: current.image_url,
+        },
         {
             preserveScroll: true,
             onSuccess: () => {
                 url.value = '';
+                preview.value = null;
             },
             onFinish: () => {
-                adding.value = false;
+                savingGift.value = false;
             },
         },
     );
 }
 
+function cancelGift(): void {
+    preview.value = null;
+}
+
 function saveTitle(event: Event): void {
-    const title = inputValue(event);
+    const title = (event.target as HTMLInputElement).value.trim();
 
     if (title !== '' && title !== props.wishlist.title) {
         router.patch('/list', { title }, { preserveScroll: true });
@@ -80,36 +231,17 @@ function saveTitle(event: Event): void {
 }
 
 function setTheme(value: string): void {
-    if (value === theme.value) {
-        return;
-    }
-
-    theme.value = value;
-    router.patch('/list', { theme: value }, { preserveScroll: true });
-}
-
-function saveItemTitle(item: WishlistItem, event: Event): void {
-    const title = inputValue(event);
-
-    if (title !== '' && title !== item.title) {
-        router.patch(`/items/${item.id}`, { title }, { preserveScroll: true });
+    if (value !== theme.value) {
+        theme.value = value;
+        router.patch('/list', { theme: value }, { preserveScroll: true });
     }
 }
 
-function saveItemPrice(item: WishlistItem, event: Event): void {
-    const price = inputValue(event);
-
-    if (price !== (item.price ?? '')) {
-        router.patch(
-            `/items/${item.id}`,
-            { price: price === '' ? null : price },
-            { preserveScroll: true },
-        );
+function setLayout(value: WishlistLayout): void {
+    if (value !== layout.value) {
+        layout.value = value;
+        router.patch('/list', { layout: value }, { preserveScroll: true });
     }
-}
-
-function removeItem(item: WishlistItem): void {
-    router.delete(`/items/${item.id}`, { preserveScroll: true });
 }
 
 function sendLink(): void {
@@ -135,7 +267,7 @@ function logout(): void {
 }
 
 function blurOnEnter(event: KeyboardEvent): void {
-    (event.target as HTMLInputElement).blur();
+    (event.target as HTMLElement).blur();
 }
 </script>
 
@@ -157,7 +289,7 @@ function blurOnEnter(event: KeyboardEvent): void {
             class="skin-outline border-x-0 border-t-0 bg-band text-on-band"
         >
             <form
-                class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-5 gap-y-3 px-5 py-3.5 sm:px-8"
+                class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-3 px-5 py-3.5 sm:px-8"
                 @submit.prevent="sendLink"
             >
                 <label
@@ -200,42 +332,19 @@ function blurOnEnter(event: KeyboardEvent): void {
             </form>
         </div>
 
-        <div class="mx-auto max-w-5xl px-5 pb-24 sm:px-8">
+        <div class="mx-auto max-w-6xl px-5 pb-24 sm:px-8">
             <header
-                class="flex flex-wrap items-center justify-between gap-4 py-6"
+                class="flex flex-wrap items-center justify-between gap-4 py-5"
             >
-                <div class="skin-display text-[28px]">tobym</div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <div
-                        role="group"
-                        aria-label="Skórka listy"
-                        class="flex flex-wrap gap-2"
-                    >
-                        <button
-                            v-for="option in themes"
-                            :key="option.value"
-                            type="button"
-                            :aria-pressed="option.value === theme"
-                            class="skin-outline h-11 rounded-control px-4 text-sm font-semibold"
-                            :class="
-                                option.value === theme
-                                    ? 'bg-ink text-ground'
-                                    : 'bg-surface text-ink'
-                            "
-                            @click="setTheme(option.value)"
-                        >
-                            {{ option.label }}
-                        </button>
-                    </div>
-                    <button
-                        v-if="user"
-                        type="button"
-                        class="h-11 px-3 text-sm text-muted underline underline-offset-4"
-                        @click="logout"
-                    >
-                        Wyloguj ({{ user.email }})
-                    </button>
-                </div>
+                <div class="skin-display text-[26px]">tobym</div>
+                <button
+                    v-if="user"
+                    type="button"
+                    class="h-11 px-1 text-sm text-muted underline underline-offset-4"
+                    @click="logout"
+                >
+                    Wyloguj ({{ user.email }})
+                </button>
             </header>
 
             <p
@@ -246,7 +355,7 @@ function blurOnEnter(event: KeyboardEvent): void {
                 {{ status }}
             </p>
 
-            <section class="skin-hero flex flex-col gap-3 pt-8 pb-9">
+            <section class="skin-hero flex flex-col gap-3 pt-6 pb-9">
                 <label for="list-title" class="sr-only">Nazwa listy</label>
                 <input
                     id="list-title"
@@ -261,126 +370,205 @@ function blurOnEnter(event: KeyboardEvent): void {
                 <p class="text-[17px] text-muted">{{ countLabel }}</p>
             </section>
 
-            <form
-                class="skin-outline flex flex-wrap gap-2.5 rounded-card bg-surface p-2.5 shadow-card"
-                @submit.prevent="addItem"
+            <div
+                class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start"
             >
-                <label for="item-url" class="sr-only">Link do prezentu</label>
-                <input
-                    id="item-url"
-                    v-model="url"
-                    v-focus
-                    type="url"
-                    inputmode="url"
-                    placeholder="Wklej link do prezentu"
-                    class="h-12 min-w-0 flex-[1_1_16rem] rounded-control bg-transparent px-3.5 text-[17px] text-ink placeholder:text-muted"
-                />
-                <button
-                    type="submit"
-                    :disabled="adding"
-                    class="skin-outline h-12 rounded-control bg-accent px-6 text-base font-semibold text-on-accent disabled:opacity-60"
+                <aside
+                    class="flex flex-col gap-6 lg:sticky lg:top-6 lg:order-2"
+                    aria-label="Opcje listy"
                 >
-                    {{ adding ? 'Pobieram…' : 'Dodaj' }}
-                </button>
-            </form>
-            <p
-                v-if="errors.url"
-                role="alert"
-                class="mt-2 text-sm font-semibold text-accent"
-            >
-                {{ errors.url }}
-            </p>
-
-            <TransitionGroup
-                tag="ul"
-                name="item"
-                class="relative mt-10 grid grid-cols-[repeat(auto-fill,minmax(16.5rem,1fr))] gap-7"
-            >
-                <li
-                    v-for="item in wishlist.items"
-                    :key="item.id"
-                    class="skin-outline flex flex-col overflow-hidden rounded-card bg-surface shadow-card"
-                >
-                    <div
-                        class="skin-outline flex aspect-[4/3] items-center justify-center border-x-0 border-t-0 bg-tile"
+                    <form
+                        class="skin-outline flex flex-col gap-3 rounded-card bg-surface p-4 shadow-card"
+                        @submit.prevent="submitLink"
                     >
-                        <img
-                            v-if="item.image_url"
-                            :src="item.image_url"
-                            alt=""
-                            loading="lazy"
-                            referrerpolicy="no-referrer"
-                            class="h-full w-full object-cover"
-                        />
-                        <span v-else class="text-sm text-ink">bez zdjęcia</span>
-                    </div>
-                    <div class="flex flex-1 flex-col gap-3 p-4">
-                        <div class="flex flex-col gap-1">
-                            <label :for="`title-${item.id}`" class="sr-only"
-                                >Nazwa prezentu</label
-                            >
-                            <input
-                                :id="`title-${item.id}`"
-                                :key="item.title"
-                                type="text"
-                                :value="item.title"
-                                maxlength="255"
-                                class="skin-display w-full bg-transparent text-[22px] leading-tight text-ink"
-                                @blur="saveItemTitle(item, $event)"
-                                @keydown.enter="blurOnEnter"
-                            />
-                            <a
-                                v-if="item.url"
-                                :href="item.url"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="truncate text-sm text-muted underline underline-offset-4"
-                                >{{ item.shop ?? 'otwórz stronę' }}</a
-                            >
-                        </div>
-                        <div
-                            class="mt-auto flex items-center justify-between gap-3"
+                        <label for="item-url" class="skin-display text-[22px]"
+                            >Dodaj prezent</label
                         >
-                            <label :for="`price-${item.id}`" class="sr-only"
-                                >Cena</label
-                            >
-                            <input
-                                :id="`price-${item.id}`"
-                                :key="item.price ?? ''"
-                                type="text"
-                                :value="item.price ?? ''"
-                                maxlength="64"
-                                placeholder="cena"
-                                class="h-11 min-w-0 flex-1 bg-transparent text-base font-semibold text-ink placeholder:font-normal placeholder:text-muted"
-                                @blur="saveItemPrice(item, $event)"
-                                @keydown.enter="blurOnEnter"
-                            />
+                        <input
+                            id="item-url"
+                            v-model="url"
+                            v-focus
+                            type="url"
+                            inputmode="url"
+                            placeholder="Wklej link do prezentu"
+                            class="skin-outline h-12 w-full rounded-control bg-surface px-3.5 text-base text-ink placeholder:text-muted"
+                        />
+                        <button
+                            type="submit"
+                            :disabled="loadingPreview"
+                            class="skin-outline h-12 rounded-control bg-accent px-6 text-base font-semibold text-on-accent disabled:opacity-60"
+                        >
+                            {{ loadingPreview ? 'Pobieram dane…' : 'Dodaj' }}
+                        </button>
+                        <p
+                            v-if="urlError || errors.url"
+                            role="alert"
+                            class="text-sm font-semibold text-accent"
+                        >
+                            {{ urlError || errors.url }}
+                        </p>
+                    </form>
+
+                    <div
+                        role="group"
+                        aria-labelledby="layout-heading"
+                        class="flex flex-col gap-2.5"
+                    >
+                        <h2 id="layout-heading" class="text-sm font-semibold">
+                            Widok
+                        </h2>
+                        <div class="flex flex-wrap gap-2">
                             <button
+                                v-for="option in layoutOptions"
+                                :key="option.value"
                                 type="button"
-                                :aria-label="`Usuń: ${item.title}`"
-                                class="skin-outline flex h-11 w-11 flex-none items-center justify-center rounded-control bg-surface text-ink"
-                                @click="removeItem(item)"
+                                :aria-pressed="option.value === layout"
+                                class="skin-outline h-11 flex-1 rounded-control px-4 text-sm font-semibold"
+                                :class="
+                                    option.value === layout
+                                        ? 'bg-ink text-ground'
+                                        : 'bg-surface text-ink'
+                                "
+                                @click="setLayout(option.value)"
                             >
-                                <svg
-                                    aria-hidden="true"
-                                    width="18"
-                                    height="18"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="1.8"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                >
-                                    <path d="M3 6h18" />
-                                    <path d="M8 6V4h8v2" />
-                                    <path d="M6 6l1 14h10l1-14" />
-                                </svg>
+                                {{ option.label }}
                             </button>
                         </div>
                     </div>
-                </li>
-            </TransitionGroup>
+
+                    <div
+                        role="group"
+                        aria-labelledby="theme-heading"
+                        class="flex flex-col gap-2.5"
+                    >
+                        <h2 id="theme-heading" class="text-sm font-semibold">
+                            Skórka
+                        </h2>
+                        <div class="flex flex-col gap-2">
+                            <button
+                                v-for="option in themes"
+                                :key="option.value"
+                                type="button"
+                                :aria-pressed="option.value === theme"
+                                class="skin-outline h-11 rounded-control px-4 text-left text-sm font-semibold"
+                                :class="
+                                    option.value === theme
+                                        ? 'bg-ink text-ground'
+                                        : 'bg-surface text-ink'
+                                "
+                                @click="setTheme(option.value)"
+                            >
+                                {{ option.label }}
+                            </button>
+                        </div>
+                    </div>
+                </aside>
+
+                <main class="flex min-w-0 flex-col gap-6 lg:order-1">
+                    <div
+                        v-if="wishlist.items.length > 0"
+                        class="flex flex-wrap items-end gap-3"
+                    >
+                        <div
+                            class="flex min-w-0 flex-[1_1_14rem] flex-col gap-1.5"
+                        >
+                            <label
+                                for="list-search"
+                                class="text-sm font-semibold"
+                                >Szukaj</label
+                            >
+                            <input
+                                id="list-search"
+                                v-model="search"
+                                type="search"
+                                placeholder="Nazwa prezentu"
+                                class="skin-outline h-11 w-full rounded-control bg-surface px-3.5 text-[15px] text-ink placeholder:text-muted"
+                            />
+                        </div>
+                        <div
+                            v-if="shops.length > 1"
+                            class="flex min-w-0 flex-[1_1_10rem] flex-col gap-1.5"
+                        >
+                            <label for="list-shop" class="text-sm font-semibold"
+                                >Sklep</label
+                            >
+                            <select
+                                id="list-shop"
+                                v-model="shop"
+                                class="skin-outline h-11 w-full rounded-control bg-surface px-3 text-[15px] text-ink"
+                            >
+                                <option value="">Wszystkie sklepy</option>
+                                <option
+                                    v-for="name in shops"
+                                    :key="name"
+                                    :value="name"
+                                >
+                                    {{ name }}
+                                </option>
+                            </select>
+                        </div>
+                        <div
+                            class="flex min-w-0 flex-[1_1_12rem] flex-col gap-1.5"
+                        >
+                            <label for="list-sort" class="text-sm font-semibold"
+                                >Sortowanie</label
+                            >
+                            <select
+                                id="list-sort"
+                                v-model="sort"
+                                class="skin-outline h-11 w-full rounded-control bg-surface px-3 text-[15px] text-ink"
+                            >
+                                <option
+                                    v-for="option in sortOptions"
+                                    :key="option.value"
+                                    :value="option.value"
+                                >
+                                    {{ option.label }}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <p
+                        v-if="wishlist.items.length === 0"
+                        class="skin-outline rounded-card bg-surface p-8 text-center text-[17px] text-muted"
+                    >
+                        Wklej link do pierwszego prezentu w polu „Dodaj
+                        prezent”.
+                    </p>
+                    <p
+                        v-else-if="visibleItems.length === 0"
+                        class="text-[17px] text-muted"
+                    >
+                        Żaden prezent nie pasuje do tych filtrów.
+                    </p>
+
+                    <TransitionGroup
+                        tag="ul"
+                        name="item"
+                        class="relative"
+                        :class="
+                            layout === 'rows'
+                                ? 'flex flex-col gap-4'
+                                : 'grid grid-cols-[repeat(auto-fill,minmax(15.5rem,1fr))] gap-6'
+                        "
+                    >
+                        <GiftItem
+                            v-for="item in visibleItems"
+                            :key="item.id"
+                            :item="item"
+                            :layout="layout"
+                        />
+                    </TransitionGroup>
+                </main>
+            </div>
         </div>
+
+        <AddGiftDialog
+            :preview="preview"
+            :saving="savingGift"
+            @confirm="confirmGift"
+            @cancel="cancelGift"
+        />
     </div>
 </template>

@@ -36,6 +36,33 @@ class WishlistTest extends TestCase
         ]);
     }
 
+    public function test_confirmed_details_are_stored_as_given(): void
+    {
+        Http::preventStrayRequests();
+
+        $this->post(route('items.store'), [
+            'url' => 'https://sklep.invalid/produkt',
+            'title' => 'Bardzo długa nazwa prezentu, którą użytkownik poprawił w oknie potwierdzenia',
+            'price' => '349 zł',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('wishlist_items', [
+            'title' => 'Bardzo długa nazwa prezentu, którą użytkownik poprawił w oknie potwierdzenia',
+            'price' => '349 zł',
+        ]);
+    }
+
+    public function test_the_preview_returns_fallback_details_for_an_unreachable_shop(): void
+    {
+        Http::preventStrayRequests();
+
+        $this->postJson(route('items.preview'), ['url' => 'https://sklep.invalid/produkt'])
+            ->assertOk()
+            ->assertJson(['title' => 'sklep.invalid', 'price' => null]);
+
+        $this->assertDatabaseCount('wishlist_items', 0);
+    }
+
     public function test_an_item_from_another_list_cannot_be_deleted(): void
     {
         $wishlist = Wishlist::query()->create([

@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\Layout;
 use App\Enums\Theme;
 use App\Models\User;
 use App\Models\Wishlist;
@@ -55,6 +56,7 @@ class CurrentWishlist
         $attributes = [
             'title' => Wishlist::DEFAULT_TITLE,
             'theme' => Theme::Swiateczna,
+            'layout' => Layout::Tiles,
         ];
 
         $user = $request->user();

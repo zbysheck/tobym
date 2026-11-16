@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Layout;
 use App\Enums\Theme;
 use App\Models\Wishlist;
 use App\Models\WishlistItem;
@@ -22,6 +23,7 @@ class WishlistController extends Controller
             'wishlist' => [
                 'title' => $wishlist->title ?? Wishlist::DEFAULT_TITLE,
                 'theme' => ($wishlist->theme ?? Theme::Swiateczna)->value,
+                'layout' => ($wishlist->layout ?? Layout::Tiles)->value,
                 'items' => $wishlist === null ? [] : $wishlist->items
                     ->map(fn (WishlistItem $item): array => [
                         'id' => $item->id,
@@ -46,6 +48,7 @@ class WishlistController extends Controller
         $data = $request->validate([
             'title' => ['sometimes', 'required', 'string', 'max:120'],
             'theme' => ['sometimes', 'required', Rule::enum(Theme::class)],
+            'layout' => ['sometimes', 'required', Rule::enum(Layout::class)],
         ]);
 
         $current->findOrCreate($request)->update($data);
