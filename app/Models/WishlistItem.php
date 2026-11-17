@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Services\ProductImageCache;
+use App\Support\ActivityLog;
+use App\Support\Urls;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -44,7 +46,15 @@ class WishlistItem extends Model
             if ($item->image_url !== null && $item->image_path === null) {
                 defer(fn () => app(ProductImageCache::class)->cacheFor($item));
             }
+
+            ActivityLog::record('item.added', "Dodano „{$item->title}”".($item->shop !== null ? " ({$item->shop})" : ''), $item->wishlist, [
+                'host' => $item->url === null ? null : Urls::host($item->url),
+                'image' => $item->image_url !== null || $item->image_path !== null,
+                'price' => $item->price !== null,
+            ]);
         });
+
+        static::deleted(fn (WishlistItem $item) => ActivityLog::record('item.deleted', "Usunięto „{$item->title}”", $item->wishlist));
     }
 
     /**

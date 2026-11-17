@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdminBar from '@/components/AdminBar.vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { themeFontsUrl } from '@/lib/themes';
@@ -44,6 +45,8 @@ function unlock(): void {
         <link rel="preconnect" href="https://fonts.bunny.net" />
         <link rel="stylesheet" :href="themeFontsUrl(theme)" />
     </Head>
+
+    <AdminBar />
 
     <div
         :data-theme="theme"

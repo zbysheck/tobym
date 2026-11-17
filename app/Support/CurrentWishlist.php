@@ -27,7 +27,7 @@ class CurrentWishlist
      */
     public function query(Request $request): ?Builder
     {
-        $user = $request->user();
+        $user = $this->user($request);
 
         if ($user instanceof User) {
             return Wishlist::query()->where('user_id', $user->id);
@@ -53,7 +53,7 @@ class CurrentWishlist
 
     public function owns(Request $request, Wishlist $wishlist): bool
     {
-        $user = $request->user();
+        $user = $this->user($request);
 
         if ($user instanceof User) {
             return $wishlist->user_id === $user->id;
@@ -67,8 +67,28 @@ class CurrentWishlist
             && hash_equals($wishlist->draft_token, $hash);
     }
 
+    /**
+     * Zalogowany użytkownik, chyba że admin ogląda stronę jako właściciel szkicu.
+     */
+    public function user(Request $request): ?User
+    {
+        if ($request->attributes->has(Impersonation::DRAFT)) {
+            return null;
+        }
+
+        $user = $request->user();
+
+        return $user instanceof User ? $user : null;
+    }
+
     public function draftHash(Request $request): ?string
     {
+        $impersonated = $request->attributes->get(Impersonation::DRAFT);
+
+        if (is_string($impersonated)) {
+            return $impersonated === '' ? null : $impersonated;
+        }
+
         $token = $request->cookie(self::COOKIE);
 
         return is_string($token) && $token !== '' ? hash('sha256', $token) : null;
@@ -91,7 +111,7 @@ class CurrentWishlist
             ...$attributes,
         ];
 
-        $user = $request->user();
+        $user = $this->user($request);
 
         if ($user instanceof User) {
             return $user->wishlists()->create($attributes);

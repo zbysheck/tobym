@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Wishlist;
 use App\Models\WishlistItem;
 use App\Services\ProductMetadataFetcher;
+use App\Support\ActivityLog;
 use App\Support\CurrentWishlist;
+use App\Support\Urls;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,6 +28,16 @@ class WishlistItemController extends Controller
     {
         $url = $this->validatedUrl($request);
         $metadata = $fetcher->fetch($url, allowAi: $request->boolean('deep'));
+
+        if (! $request->boolean('deep')) {
+            $result = $metadata->gone ? 'produktu nie ma' : ($metadata->blocked ? 'sklep zablokował' : 'odczytano');
+            ActivityLog::record('preview', 'Podgląd linku: '.(Urls::host($url) ?? $url).", {$result}", null, [
+                'host' => Urls::host($url),
+                'blocked' => $metadata->blocked,
+                'image' => $metadata->imageUrl !== null,
+                'price' => $metadata->price !== null,
+            ]);
+        }
 
         return response()->json([
             'url' => $url,
@@ -51,6 +63,11 @@ class WishlistItemController extends Controller
         set_time_limit(150);
         $html = mb_strcut($request->string('html')->toString(), 0, 3_000_000, 'UTF-8');
         $metadata = $fetcher->fromHtml($url, $html);
+        ActivityLog::record('preview.addon', 'Wtyczka odczytała: '.(Urls::host($url) ?? $url), null, [
+            'host' => Urls::host($url),
+            'image' => $metadata->imageUrl !== null,
+            'price' => $metadata->price !== null,
+        ]);
 
         return response()->json([
             'url' => $url,

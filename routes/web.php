@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AddonController;
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\LoginLinkController;
 use App\Http\Controllers\MyListsController;
 use App\Http\Controllers\PageController;
@@ -44,3 +45,18 @@ Route::get('/addon/connect', [AddonController::class, 'connectPage'])->name('add
 Route::post('/addon/connect', [AddonController::class, 'connect'])->middleware('throttle:10,1')->name('addon.connect.store');
 
 Route::post('/logout', [LoginLinkController::class, 'destroy'])->name('logout');
+
+// Panel admina (tylko maile z ADMIN_EMAILS, reszta dostaje 404).
+Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): void {
+    Route::get('/', [AdminController::class, 'dashboard'])->name('dashboard');
+    Route::get('/listy', [AdminController::class, 'lists'])->name('lists');
+    Route::get('/listy/{wishlist}', [WishlistController::class, 'adminPreview'])->name('lists.preview');
+    Route::get('/konta', [AdminController::class, 'users'])->name('users');
+    Route::get('/sklepy', [AdminController::class, 'shops'])->name('shops');
+    Route::delete('/sklepy/{domain}', [AdminController::class, 'forgetRecipe'])->where('domain', '[A-Za-z0-9.\-]+')->name('shops.forget');
+    Route::match(['get', 'post'], '/symulator', [AdminController::class, 'probe'])->name('probe');
+    Route::get('/zdarzenia', [AdminController::class, 'events'])->name('events');
+    Route::post('/jako/lista/{wishlist}', [AdminController::class, 'viewAsOwner'])->name('view-as.list');
+    Route::post('/jako/konto/{user}', [AdminController::class, 'viewAsUser'])->name('view-as.user');
+    Route::post('/jako/koniec', [AdminController::class, 'stopViewing'])->name('view-as.stop');
+});

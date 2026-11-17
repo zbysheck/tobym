@@ -6,7 +6,9 @@ use App\Mail\LoginLinkMail;
 use App\Models\AddonToken;
 use App\Models\User;
 use App\Models\Wishlist;
+use App\Support\ActivityLog;
 use App\Support\CurrentWishlist;
+use App\Support\Impersonation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,6 +26,8 @@ class LoginLinkController extends Controller
 
     public function store(Request $request, CurrentWishlist $current): RedirectResponse
     {
+        abort_if(Impersonation::admin($request) !== null, 403, 'Wyjdź z podglądu „jako”, zanim wyślesz link logowania.');
+
         $request->validate([
             'email' => ['required', 'string', 'email', 'max:254'],
         ], [
@@ -51,6 +55,7 @@ class LoginLinkController extends Controller
         $url = URL::temporarySignedRoute('login.verify', now()->addMinutes(self::LINK_MINUTES), $parameters);
 
         Mail::to($user->email)->send(new LoginLinkMail($url, self::LINK_MINUTES));
+        ActivityLog::record('auth.link', 'Wysłano link logowania', null, ['user_id' => $user->id]);
 
         return back()->with('status', 'Wysłaliśmy link na '.$email.'. Kliknij go, aby zapisać listę.');
     }
@@ -75,6 +80,7 @@ class LoginLinkController extends Controller
         $draftHashes = array_values(array_filter([$request->string('d')->toString(), $current->draftHash($request)]));
 
         Auth::login($user, remember: true);
+        ActivityLog::record('auth.login', 'Logowanie linkiem z maila');
         $request->session()->regenerate();
 
         if ($draftHashes !== []) {
@@ -96,6 +102,16 @@ class LoginLinkController extends Controller
 
     public function destroy(Request $request): RedirectResponse
     {
+        // Wylogowanie w trakcie podglądu "jako" kończy podgląd, a nie sesję admina.
+        $admin = Impersonation::admin($request);
+
+        if ($admin !== null) {
+            Impersonation::stop($request);
+            Auth::setUser($admin);
+
+            return redirect('/admin');
+        }
+
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

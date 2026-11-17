@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Activity;
 use App\Models\Wishlist;
 use App\Models\WishlistItem;
 use App\Services\ProductImageCache;
@@ -32,6 +33,7 @@ class DailyMaintenance extends Command
         }
 
         $removedDrafts = $drafts->delete();
+        Activity::query()->where('created_at', '<', now()->subDays(90))->delete();
         $removedImages = $images->removeOrphans();
         $bytes = $images->recount();
         $limit = (int) config('tobym.image_cache_limit');

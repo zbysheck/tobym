@@ -6,6 +6,7 @@ use App\Enums\Layout;
 use App\Enums\Theme;
 use App\Models\Wishlist;
 use App\Models\WishlistItem;
+use App\Support\ActivityLog;
 use App\Support\CurrentWishlist;
 use App\Support\GuestToken;
 use Illuminate\Http\RedirectResponse;
@@ -66,6 +67,14 @@ class WishlistController extends Controller
         }
 
         return $this->render($request, $current, $wishlist, $editable, $editable ? null : $guest->hash($request));
+    }
+
+    /**
+     * Panel admina: lista oczami gościa, bez PIN-u (rezerwacje widać tak jak gościom).
+     */
+    public function adminPreview(Request $request, CurrentWishlist $current, GuestToken $guest, Wishlist $wishlist): Response
+    {
+        return $this->render($request, $current, $wishlist, false, $guest->hash($request));
     }
 
     public function unlock(Request $request, Wishlist $wishlist): RedirectResponse
@@ -133,6 +142,11 @@ class WishlistController extends Controller
         }
 
         $wishlist->update($data);
+
+        if ($wishlist->wasChanged()) {
+            $changed = array_values(array_diff(array_keys($wishlist->getChanges()), ['updated_at']));
+            ActivityLog::record('list.updated', "Zmieniono listę „{$wishlist->title}”: ".implode(', ', $changed), $wishlist);
+        }
     }
 
     private function unlocked(Request $request, Wishlist $wishlist): bool

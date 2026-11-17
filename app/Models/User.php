@@ -38,6 +38,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Dostęp do panelu /admin mają maile z ADMIN_EMAILS.
+     */
+    public function isAdmin(): bool
+    {
+        $admins = config('tobym.admin_emails');
+
+        return is_array($admins) && in_array(strtolower($this->email), $admins, true);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

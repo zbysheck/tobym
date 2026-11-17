@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Layout;
 use App\Enums\Theme;
+use App\Support\ActivityLog;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -38,6 +39,9 @@ class Wishlist extends Model
                 $wishlist->slug = strtolower(Str::random(10));
             }
         });
+
+        static::created(fn (Wishlist $wishlist) => ActivityLog::record('list.created', "Nowa lista „{$wishlist->title}”", $wishlist));
+        static::deleted(fn (Wishlist $wishlist) => ActivityLog::record('list.deleted', "Usunięto listę „{$wishlist->title}”", $wishlist));
     }
 
     public function getRouteKeyName(): string

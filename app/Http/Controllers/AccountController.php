@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\WishlistItem;
+use App\Support\ActivityLog;
+use App\Support\Impersonation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,6 +18,7 @@ class AccountController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        abort_if(Impersonation::admin($request) !== null, 403, 'Tego nie da się zrobić w podglądzie „jako”.');
         $user = $request->user();
         abort_unless($user instanceof User, 403);
 
@@ -29,6 +32,7 @@ class AccountController extends Controller
         }
 
         $user->wishlists()->delete();
+        ActivityLog::record('account.deleted', 'Usunięto konto');
         Auth::logout();
         $user->delete();
 

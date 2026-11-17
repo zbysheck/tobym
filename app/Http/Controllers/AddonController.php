@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Wishlist;
 use App\Services\ProductExtractor;
 use App\Support\CurrentWishlist;
+use App\Support\Impersonation;
 use App\Support\Urls;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -31,6 +32,7 @@ class AddonController extends Controller
 
     public function connect(Request $request, CurrentWishlist $current): RedirectResponse
     {
+        abort_if(Impersonation::admin($request) !== null, 403, 'Tego nie da się zrobić w podglądzie „jako”.');
         $user = $request->user();
         $draftHash = null;
 

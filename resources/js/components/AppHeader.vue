@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { router, usePage } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import AdminBar from '@/components/AdminBar.vue';
 import AppLogo from '@/components/AppLogo.vue';
 
 const page = usePage();
@@ -41,6 +42,7 @@ function logout(): void {
 
 <template>
     <header class="flex flex-wrap items-center justify-between gap-3 py-5">
+        <AdminBar />
         <AppLogo />
         <nav aria-label="Konto" class="flex items-center gap-2">
             <a
@@ -95,6 +97,13 @@ function logout(): void {
                             href="/moje-listy"
                             class="px-4 py-3 text-[15px] hover:bg-tile"
                             >Moje listy</a
+                        >
+                        <a
+                            v-if="page.props.auth.isAdmin"
+                            role="menuitem"
+                            href="/admin"
+                            class="px-4 py-3 text-[15px] hover:bg-tile"
+                            >Panel admina</a
                         >
                         <a
                             role="menuitem"

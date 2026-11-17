@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\ActivityLog;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,6 +21,20 @@ use Illuminate\Support\Carbon;
 #[Fillable(['name', 'guest_token'])]
 class Reservation extends Model
 {
+    protected static function booted(): void
+    {
+        static::created(fn (Reservation $reservation) => ActivityLog::record(
+            'reservation.added',
+            "Rezerwacja „{$reservation->item?->title}” ({$reservation->name})",
+            $reservation->item?->wishlist,
+        ));
+        static::deleted(fn (Reservation $reservation) => ActivityLog::record(
+            'reservation.removed',
+            "Odwołano rezerwację „{$reservation->item?->title}”",
+            $reservation->item?->wishlist,
+        ));
+    }
+
     /**
      * @return BelongsTo<WishlistItem, $this>
      */

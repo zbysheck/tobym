@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdminBar from '@/components/AdminBar.vue';
 import { Head } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
@@ -127,6 +128,8 @@ const faq = [
         <link rel="preconnect" href="https://fonts.bunny.net" />
         <link rel="stylesheet" :href="allThemeFontsUrl()" />
     </Head>
+
+    <AdminBar />
 
     <div
         data-theme="swiateczna"

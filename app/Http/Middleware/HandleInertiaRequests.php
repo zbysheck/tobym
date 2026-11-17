@@ -2,8 +2,10 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use App\Models\Wishlist;
 use App\Support\CurrentWishlist;
+use App\Support\Impersonation;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -41,7 +43,11 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
-                'user' => $request->user(),
+                'user' => app(CurrentWishlist::class)->user($request),
+                // Admin widzi belkę na górze także wtedy, gdy ogląda stronę "jako" ktoś inny.
+                'isAdmin' => Impersonation::admin($request) !== null
+                    || ($request->user() instanceof User && $request->user()->isAdmin()),
+                'viewingAs' => Impersonation::admin($request) !== null ? Impersonation::label($request) : null,
             ],
             // Czy odwiedzający ma jakąkolwiek listę (link "Moje listy" w nagłówku).
             'hasLists' => fn () => app(CurrentWishlist::class)->query($request)?->exists() ?? false,
