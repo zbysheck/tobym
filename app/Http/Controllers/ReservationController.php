@@ -54,6 +54,6 @@ class ReservationController extends Controller
     {
         abort_unless($item->wishlist_id === $wishlist->id, 404);
         // Właściciel nie rezerwuje własnych prezentów (i nie powinien widzieć rezerwacji).
-        abort_if($current->find($request)?->id === $wishlist->id, 403);
+        abort_if($current->owns($request, $wishlist), 403);
     }
 }

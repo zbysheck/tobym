@@ -25,6 +25,7 @@ COMPOSER=$(find_composer)
 
 $COMPOSER install --no-dev --optimize-autoloader --no-interaction
 php artisan migrate --force
+[ -L public/storage ] || php artisan storage:link
 php artisan optimize
 
 echo "Deploy OK: $(git log -1 --format='%h %s')"

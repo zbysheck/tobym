@@ -1,18 +1,38 @@
 <script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
+import { VueDraggable } from 'vue-draggable-plus';
 import AddGiftDialog from '@/components/AddGiftDialog.vue';
 import GiftItem from '@/components/GiftItem.vue';
+import ListSidebar from '@/components/ListSidebar.vue';
+import QrDialog from '@/components/QrDialog.vue';
 import ReserveDialog from '@/components/ReserveDialog.vue';
+import {
+    countdown,
+    fetchPreview,
+    formatDate,
+    itemsUrl,
+    listUrl,
+    priceValue,
+    textOn,
+} from '@/lib/wishlist';
 import type {
+    GiftDetails,
     GiftPreview,
+    ListSummary,
     ThemeOption,
     WishlistData,
     WishlistItem,
     WishlistLayout,
 } from '@/types';
 
-type SortKey = 'added' | 'newest' | 'price-asc' | 'price-desc' | 'name';
+type SortKey =
+    | 'added'
+    | 'priority'
+    | 'newest'
+    | 'price-asc'
+    | 'price-desc'
+    | 'name';
 
 const props = defineProps<{
     wishlist: WishlistData;
@@ -20,19 +40,16 @@ const props = defineProps<{
     editable: boolean;
     slug: string | null;
     shareUrl: string | null;
+    lists: ListSummary[];
 }>();
 
 const sortOptions: { value: SortKey; label: string }[] = [
-    { value: 'added', label: 'Kolejność dodania' },
+    { value: 'added', label: 'Moja kolejność' },
+    { value: 'priority', label: 'Najważniejsze najpierw' },
     { value: 'newest', label: 'Najnowsze' },
     { value: 'price-asc', label: 'Cena: od najniższej' },
     { value: 'price-desc', label: 'Cena: od najwyższej' },
     { value: 'name', label: 'Nazwa: A–Z' },
-];
-
-const layoutOptions: { value: WishlistLayout; label: string }[] = [
-    { value: 'tiles', label: 'Kafelki' },
-    { value: 'rows', label: 'Rzędy' },
 ];
 
 const page = usePage();
@@ -42,19 +59,33 @@ const errors = computed(() => page.props.errors);
 
 const theme = ref(props.wishlist.theme);
 const layout = ref<WishlistLayout>(props.wishlist.layout);
+const accent = ref<string | null>(props.wishlist.accent);
 watch(
-    () => [props.wishlist.theme, props.wishlist.layout] as const,
-    ([nextTheme, nextLayout]) => {
-        theme.value = nextTheme;
-        layout.value = nextLayout;
+    () => props.wishlist,
+    (next) => {
+        theme.value = next.theme;
+        layout.value = next.layout;
+        accent.value = next.accent;
     },
 );
 
-const url = ref('');
+const accentStyle = computed(() =>
+    accent.value
+        ? {
+              '--skin-accent': accent.value,
+              '--skin-on-accent': textOn(accent.value),
+          }
+        : {},
+);
+
+const sidebar = ref<InstanceType<typeof ListSidebar> | null>(null);
 const urlError = ref('');
 const loadingPreview = ref(false);
+const enriching = ref(false);
 const preview = ref<GiftPreview | null>(null);
 const savingGift = ref(false);
+const giftErrors = ref<Record<string, string>>({});
+const qrOpen = ref(false);
 
 const email = ref('');
 const sending = ref(false);
@@ -73,14 +104,6 @@ const shops = computed(() =>
         ),
     ].sort((a, b) => a.localeCompare(b, 'pl')),
 );
-
-function priceValue(item: WishlistItem): number | null {
-    const match = /\d+(?:\.\d+)?/.exec(
-        (item.price ?? '').replace(/[\s ]/g, '').replace(',', '.'),
-    );
-
-    return match ? Number(match[0]) : null;
-}
 
 function byPrice(direction: 1 | -1) {
     return (a: WishlistItem, b: WishlistItem): number => {
@@ -101,12 +124,18 @@ const visibleItems = computed(() => {
         (item) =>
             (shop.value === '' || item.shop === shop.value) &&
             (!onlyFree.value || item.reservation === null) &&
-            (phrase === '' || item.title.toLowerCase().includes(phrase)),
+            (phrase === '' ||
+                item.title.toLowerCase().includes(phrase) ||
+                (item.note ?? '').toLowerCase().includes(phrase)),
     );
 
     switch (sort.value) {
+        case 'priority':
+            return items.sort(
+                (a, b) => Number(b.priority) - Number(a.priority),
+            );
         case 'newest':
-            return items.reverse();
+            return items.sort((a, b) => b.id - a.id);
         case 'price-asc':
             return items.sort(byPrice(1));
         case 'price-desc':
@@ -117,6 +146,31 @@ const visibleItems = computed(() => {
             return items;
     }
 });
+
+// Przeciąganie działa tylko w "mojej kolejności", bez filtrów, żeby kolejność była jednoznaczna.
+const canReorder = computed(
+    () =>
+        props.editable &&
+        props.slug !== null &&
+        sort.value === 'added' &&
+        search.value.trim() === '' &&
+        shop.value === '',
+);
+const orderedItems = ref<WishlistItem[]>([...props.wishlist.items]);
+watch(
+    () => props.wishlist.items,
+    (items) => {
+        orderedItems.value = [...items];
+    },
+);
+
+function saveOrder(): void {
+    router.patch(
+        `/l/${props.slug ?? ''}/order`,
+        { ids: orderedItems.value.map((item) => item.id) },
+        { preserveScroll: true },
+    );
+}
 
 const countLabel = computed(() => {
     const count = props.wishlist.items.length;
@@ -138,66 +192,20 @@ const countLabel = computed(() => {
     return `${count} prezentów na liście`;
 });
 
-function xsrfToken(): string {
-    const match = /(?:^|; )XSRF-TOKEN=([^;]+)/.exec(document.cookie);
+const eventLabel = computed(() =>
+    props.wishlist.event_date
+        ? `${formatDate(props.wishlist.event_date)} · ${countdown(props.wishlist.event_date)}`
+        : null,
+);
 
-    return match ? decodeURIComponent(match[1]) : '';
-}
-
-type PreviewResult =
-    | { ok: true; preview: GiftPreview }
-    | { ok: false; error: string };
-
-async function fetchPreview(
-    link: string,
-    deep: boolean,
-): Promise<PreviewResult> {
-    try {
-        const response = await fetch('/items/preview', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-                'X-XSRF-TOKEN': xsrfToken(),
-            },
-            body: JSON.stringify({ url: link, deep }),
-        });
-
-        if (response.status === 422) {
-            const body = (await response.json()) as {
-                errors?: Record<string, string[]>;
-            };
-
-            return {
-                ok: false,
-                error: body.errors?.url?.[0] ?? 'Nie udało się odczytać linku.',
-            };
-        }
-
-        if (!response.ok) {
-            return {
-                ok: false,
-                error: 'Nie udało się pobrać danych. Odśwież stronę i spróbuj ponownie.',
-            };
-        }
-
-        return { ok: true, preview: (await response.json()) as GiftPreview };
-    } catch {
-        return { ok: false, error: 'Brak połączenia. Spróbuj ponownie.' };
-    }
-}
-
-const enriching = ref(false);
-
-async function requestPreview(): Promise<void> {
-    const link = url.value.trim();
-
-    if (link === '' || loadingPreview.value) {
+async function addLink(link: string): Promise<void> {
+    if (loadingPreview.value) {
         return;
     }
 
     loadingPreview.value = true;
     urlError.value = '';
+    giftErrors.value = {};
 
     const quick = await fetchPreview(link, false);
     loadingPreview.value = false;
@@ -234,11 +242,19 @@ async function requestPreview(): Promise<void> {
     };
 }
 
-function submitLink(): void {
-    void requestPreview();
+function addManual(): void {
+    giftErrors.value = {};
+    preview.value = {
+        url: null,
+        title: '',
+        shop: null,
+        image_url: null,
+        price: null,
+        pending: false,
+    };
 }
 
-function confirmGift(details: { title: string; price: string }): void {
+function confirmGift(details: GiftDetails): void {
     const current = preview.value;
 
     if (current === null) {
@@ -247,19 +263,26 @@ function confirmGift(details: { title: string; price: string }): void {
 
     savingGift.value = true;
     router.post(
-        '/items',
+        itemsUrl(props.slug),
         {
             url: current.url,
             title: details.title,
             price: details.price,
+            note: details.note,
+            priority: details.priority ? 1 : 0,
             shop: current.shop,
             image_url: current.image_url,
+            photo: details.photo,
         },
         {
             preserveScroll: true,
+            forceFormData: details.photo !== null,
             onSuccess: () => {
-                url.value = '';
+                sidebar.value?.clearLink();
                 preview.value = null;
+            },
+            onError: (bag) => {
+                giftErrors.value = bag;
             },
             onFinish: () => {
                 savingGift.value = false;
@@ -268,29 +291,11 @@ function confirmGift(details: { title: string; price: string }): void {
     );
 }
 
-function cancelGift(): void {
-    preview.value = null;
-}
-
 function saveTitle(event: Event): void {
     const title = (event.target as HTMLInputElement).value.trim();
 
     if (title !== '' && title !== props.wishlist.title) {
-        router.patch('/list', { title }, { preserveScroll: true });
-    }
-}
-
-function setTheme(value: string): void {
-    if (value !== theme.value) {
-        theme.value = value;
-        router.patch('/list', { theme: value }, { preserveScroll: true });
-    }
-}
-
-function setLayout(value: WishlistLayout): void {
-    if (value !== layout.value) {
-        layout.value = value;
-        router.patch('/list', { layout: value }, { preserveScroll: true });
+        router.patch(listUrl(props.slug), { title }, { preserveScroll: true });
     }
 }
 
@@ -312,24 +317,6 @@ function sendLink(): void {
     );
 }
 
-const copied = ref(false);
-
-async function copyLink(): Promise<void> {
-    if (props.shareUrl === null) {
-        return;
-    }
-
-    try {
-        await navigator.clipboard.writeText(props.shareUrl);
-        copied.value = true;
-        window.setTimeout(() => {
-            copied.value = false;
-        }, 2000);
-    } catch {
-        window.prompt('Skopiuj link do listy:', props.shareUrl);
-    }
-}
-
 const NAME_KEY = 'tobym:guest-name';
 const reserving = ref<WishlistItem | null>(null);
 const guestName = ref(readGuestName());
@@ -344,10 +331,6 @@ function readGuestName(): string {
 
 function reservationUrl(item: WishlistItem): string {
     return `/l/${props.slug ?? ''}/items/${item.id}/reservation`;
-}
-
-function startReserving(item: WishlistItem): void {
-    reserving.value = item;
 }
 
 function confirmReservation(name: string): void {
@@ -381,10 +364,6 @@ function cancelReservation(item: WishlistItem): void {
     router.delete(reservationUrl(item), { preserveScroll: true });
 }
 
-function onThemeChange(event: Event): void {
-    setTheme((event.target as HTMLSelectElement).value);
-}
-
 function logout(): void {
     router.post('/logout');
 }
@@ -392,6 +371,12 @@ function logout(): void {
 function blurOnEnter(event: KeyboardEvent): void {
     (event.target as HTMLElement).blur();
 }
+
+const listClass = computed(() =>
+    layout.value === 'rows'
+        ? 'flex flex-col gap-4'
+        : 'grid grid-cols-[repeat(auto-fill,minmax(15.5rem,1fr))] gap-6',
+);
 </script>
 
 <template>
@@ -405,6 +390,7 @@ function blurOnEnter(event: KeyboardEvent): void {
 
     <div
         :data-theme="theme"
+        :style="accentStyle"
         class="min-h-screen bg-ground font-body text-ink antialiased"
     >
         <div
@@ -459,7 +445,7 @@ function blurOnEnter(event: KeyboardEvent): void {
             <header
                 class="flex flex-wrap items-center justify-between gap-4 py-5"
             >
-                <div class="skin-display text-[26px]">tobym</div>
+                <a href="/" class="skin-display text-[26px] text-ink">tobym</a>
                 <button
                     v-if="user"
                     type="button"
@@ -495,6 +481,9 @@ function blurOnEnter(event: KeyboardEvent): void {
                 <h1 v-else class="skin-display skin-title text-ink">
                     {{ wishlist.title }}
                 </h1>
+                <p v-if="eventLabel" class="text-[17px] font-semibold">
+                    {{ eventLabel }}
+                </p>
                 <p class="text-[17px] text-muted">{{ countLabel }}</p>
             </section>
 
@@ -506,108 +495,23 @@ function blurOnEnter(event: KeyboardEvent): void {
                         : ''
                 "
             >
-                <aside
+                <ListSidebar
                     v-if="editable"
-                    class="flex flex-col gap-6 lg:sticky lg:top-6 lg:order-2"
-                    aria-label="Opcje listy"
-                >
-                    <form
-                        class="skin-outline flex flex-col gap-3 rounded-card bg-surface p-4 shadow-card"
-                        @submit.prevent="submitLink"
-                    >
-                        <label for="item-url" class="skin-display text-[22px]"
-                            >Dodaj prezent</label
-                        >
-                        <input
-                            id="item-url"
-                            v-model="url"
-                            v-focus
-                            type="url"
-                            inputmode="url"
-                            placeholder="Wklej link do prezentu"
-                            class="skin-outline h-12 w-full rounded-control bg-surface px-3.5 text-base text-ink placeholder:text-muted"
-                        />
-                        <button
-                            type="submit"
-                            :disabled="loadingPreview"
-                            class="skin-outline h-12 rounded-control bg-accent px-6 text-base font-semibold text-on-accent disabled:opacity-60"
-                        >
-                            {{ loadingPreview ? 'Pobieram dane…' : 'Dodaj' }}
-                        </button>
-                        <p
-                            v-if="urlError || errors.url"
-                            role="alert"
-                            class="text-sm font-semibold text-accent"
-                        >
-                            {{ urlError || errors.url }}
-                        </p>
-                    </form>
-
-                    <div
-                        role="group"
-                        aria-labelledby="layout-heading"
-                        class="flex flex-col gap-2.5"
-                    >
-                        <h2 id="layout-heading" class="text-sm font-semibold">
-                            Widok
-                        </h2>
-                        <div class="flex flex-wrap gap-2">
-                            <button
-                                v-for="option in layoutOptions"
-                                :key="option.value"
-                                type="button"
-                                :aria-pressed="option.value === layout"
-                                class="skin-outline h-11 flex-1 rounded-control px-4 text-sm font-semibold"
-                                :class="
-                                    option.value === layout
-                                        ? 'bg-ink text-ground'
-                                        : 'bg-surface text-ink'
-                                "
-                                @click="setLayout(option.value)"
-                            >
-                                {{ option.label }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col gap-2.5">
-                        <label for="list-theme" class="text-sm font-semibold"
-                            >Skórka</label
-                        >
-                        <select
-                            id="list-theme"
-                            :value="theme"
-                            class="skin-outline h-11 w-full rounded-control bg-surface px-3 text-[15px] text-ink"
-                            @change="onThemeChange"
-                        >
-                            <option
-                                v-for="option in themes"
-                                :key="option.value"
-                                :value="option.value"
-                            >
-                                {{ option.label }}
-                            </option>
-                        </select>
-                    </div>
-
-                    <div v-if="shareUrl" class="flex flex-col gap-2.5">
-                        <h2 class="text-sm font-semibold">Udostępnij</h2>
-                        <button
-                            type="button"
-                            class="skin-outline h-11 rounded-control bg-surface px-4 text-sm font-semibold text-ink"
-                            @click="copyLink"
-                        >
-                            {{
-                                copied
-                                    ? 'Skopiowano link'
-                                    : 'Kopiuj link do listy'
-                            }}
-                        </button>
-                        <p class="text-xs break-all text-muted">
-                            {{ shareUrl }}
-                        </p>
-                    </div>
-                </aside>
+                    ref="sidebar"
+                    v-model:theme="theme"
+                    v-model:layout="layout"
+                    v-model:accent="accent"
+                    :wishlist="wishlist"
+                    :themes="themes"
+                    :slug="slug"
+                    :share-url="shareUrl"
+                    :lists="lists"
+                    :loading-preview="loadingPreview"
+                    :url-error="urlError"
+                    @add-link="addLink"
+                    @add-manual="addManual"
+                    @open-qr="qrOpen = true"
+                />
 
                 <main class="flex min-w-0 flex-col gap-6 lg:order-1">
                     <div
@@ -626,7 +530,7 @@ function blurOnEnter(event: KeyboardEvent): void {
                                 id="list-search"
                                 v-model="search"
                                 type="search"
-                                placeholder="Nazwa prezentu"
+                                placeholder="Nazwa albo notatka"
                                 class="skin-outline h-11 w-full rounded-control bg-surface px-3.5 text-[15px] text-ink placeholder:text-muted"
                             />
                         </div>
@@ -702,15 +606,30 @@ function blurOnEnter(event: KeyboardEvent): void {
                         Żaden prezent nie pasuje do tych filtrów.
                     </p>
 
+                    <VueDraggable
+                        v-if="canReorder"
+                        v-model="orderedItems"
+                        tag="ul"
+                        handle=".drag-handle"
+                        :animation="150"
+                        :class="listClass"
+                        @end="saveOrder"
+                    >
+                        <GiftItem
+                            v-for="item in orderedItems"
+                            :key="item.id"
+                            :item="item"
+                            :layout="layout"
+                            :editable="editable"
+                            :draggable="true"
+                        />
+                    </VueDraggable>
                     <TransitionGroup
+                        v-else
                         tag="ul"
                         name="item"
                         class="relative"
-                        :class="
-                            layout === 'rows'
-                                ? 'flex flex-col gap-4'
-                                : 'grid grid-cols-[repeat(auto-fill,minmax(15.5rem,1fr))] gap-6'
-                        "
+                        :class="listClass"
                     >
                         <GiftItem
                             v-for="item in visibleItems"
@@ -718,7 +637,8 @@ function blurOnEnter(event: KeyboardEvent): void {
                             :item="item"
                             :layout="layout"
                             :editable="editable"
-                            @reserve="startReserving"
+                            :draggable="false"
+                            @reserve="reserving = $event"
                             @unreserve="cancelReservation"
                         />
                     </TransitionGroup>
@@ -737,8 +657,15 @@ function blurOnEnter(event: KeyboardEvent): void {
             :preview="preview"
             :enriching="enriching"
             :saving="savingGift"
+            :errors="giftErrors"
             @confirm="confirmGift"
-            @cancel="cancelGift"
+            @cancel="preview = null"
+        />
+
+        <QrDialog
+            :url="qrOpen ? shareUrl : null"
+            :title="wishlist.title"
+            @close="qrOpen = false"
         />
     </div>
 </template>

@@ -8,6 +8,17 @@
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
+        @isset($og)
+            <meta property="og:type" content="website">
+            <meta property="og:title" content="{{ $og['title'] }}">
+            <meta property="og:description" content="{{ $og['description'] }}">
+            <meta property="og:url" content="{{ $og['url'] }}">
+            @if ($og['image'])
+                <meta property="og:image" content="{{ $og['image'] }}">
+                <meta name="twitter:card" content="summary_large_image">
+            @endif
+        @endisset
+
         @fonts
 
         @vite(['resources/css/app.css', 'resources/js/app.ts', "resources/js/pages/{$page['component']}.vue"])

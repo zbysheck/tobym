@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { RequestPayload } from '@inertiajs/core';
 import { router } from '@inertiajs/vue3';
 import { computed, nextTick, ref } from 'vue';
 import type { WishlistItem, WishlistLayout } from '@/types';
@@ -7,6 +8,7 @@ const props = defineProps<{
     item: WishlistItem;
     layout: WishlistLayout;
     editable: boolean;
+    draggable: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -17,11 +19,17 @@ const emit = defineEmits<{
 const rows = computed(() => props.layout === 'rows');
 const editingTitle = ref(false);
 const titleField = ref<HTMLTextAreaElement | null>(null);
+const editingNote = ref(false);
+const noteField = ref<HTMLTextAreaElement | null>(null);
+const takenByOther = computed(
+    () =>
+        !props.editable &&
+        props.item.reservation !== null &&
+        !props.item.reservation.mine,
+);
 
-async function startEditingTitle(): Promise<void> {
-    editingTitle.value = true;
-    await nextTick();
-    titleField.value?.focus();
+function patch(data: RequestPayload): void {
+    router.patch(`/items/${props.item.id}`, data, { preserveScroll: true });
 }
 
 function fieldValue(event: Event): string {
@@ -30,16 +38,33 @@ function fieldValue(event: Event): string {
     ).value.trim();
 }
 
+async function startEditingTitle(): Promise<void> {
+    editingTitle.value = true;
+    await nextTick();
+    titleField.value?.focus();
+}
+
+async function startEditingNote(): Promise<void> {
+    editingNote.value = true;
+    await nextTick();
+    noteField.value?.focus();
+}
+
 function saveTitle(event: Event): void {
     editingTitle.value = false;
     const title = fieldValue(event);
 
     if (title !== '' && title !== props.item.title) {
-        router.patch(
-            `/items/${props.item.id}`,
-            { title },
-            { preserveScroll: true },
-        );
+        patch({ title });
+    }
+}
+
+function saveNote(event: Event): void {
+    editingNote.value = false;
+    const note = fieldValue(event);
+
+    if (note !== (props.item.note ?? '')) {
+        patch({ note: note === '' ? null : note });
     }
 }
 
@@ -47,16 +72,30 @@ function savePrice(event: Event): void {
     const price = fieldValue(event);
 
     if (price !== (props.item.price ?? '')) {
-        router.patch(
-            `/items/${props.item.id}`,
-            { price: price === '' ? null : price },
-            { preserveScroll: true },
+        patch({ price: price === '' ? null : price });
+    }
+}
+
+function togglePriority(): void {
+    patch({ priority: !props.item.priority });
+}
+
+function changePhoto(event: Event): void {
+    const file = (event.target as HTMLInputElement).files?.[0];
+
+    if (file) {
+        router.post(
+            `/items/${props.item.id}/photo`,
+            { photo: file },
+            { preserveScroll: true, forceFormData: true },
         );
     }
 }
 
 function remove(): void {
-    router.delete(`/items/${props.item.id}`, { preserveScroll: true });
+    if (window.confirm(`Usunąć „${props.item.title}” z listy?`)) {
+        router.delete(`/items/${props.item.id}`, { preserveScroll: true });
+    }
 }
 
 function blurOnEnter(event: KeyboardEvent): void {
@@ -66,16 +105,15 @@ function blurOnEnter(event: KeyboardEvent): void {
 
 <template>
     <li
-        class="skin-outline overflow-hidden rounded-card bg-surface shadow-card"
+        :data-id="item.id"
+        class="skin-outline relative overflow-hidden rounded-card bg-surface shadow-card"
         :class="[
             rows ? 'flex items-stretch' : 'flex flex-col',
-            !editable && item.reservation && !item.reservation.mine
-                ? 'opacity-60'
-                : '',
+            takenByOther ? 'opacity-60' : '',
         ]"
     >
         <div
-            class="skin-outline flex flex-none items-center justify-center bg-tile"
+            class="skin-outline relative flex flex-none items-center justify-center bg-tile"
             :class="
                 rows
                     ? 'min-h-24 w-24 border-y-0 border-l-0 sm:w-32'
@@ -93,48 +131,104 @@ function blurOnEnter(event: KeyboardEvent): void {
             <span v-else class="px-2 text-center text-sm text-ink"
                 >bez zdjęcia</span
             >
+            <label
+                v-if="editable"
+                class="skin-outline absolute right-2 bottom-2 cursor-pointer rounded-control bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink opacity-90 focus-within:outline-2"
+            >
+                Zmień zdjęcie
+                <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    class="sr-only"
+                    @change="changePhoto"
+                />
+            </label>
         </div>
+
         <div
             class="flex min-w-0 flex-1 gap-3 p-4"
             :class="rows ? 'flex-wrap items-center' : 'flex-col'"
         >
             <div
-                class="flex min-w-0 flex-col gap-1"
+                class="flex min-w-0 flex-col gap-1.5"
                 :class="rows ? 'flex-[1_1_14rem]' : ''"
             >
-                <template v-if="editable && editingTitle">
-                    <label :for="`title-${item.id}`" class="sr-only"
-                        >Nazwa prezentu</label
+                <div class="flex items-start gap-2">
+                    <div class="min-w-0 flex-1">
+                        <template v-if="editable && editingTitle">
+                            <label :for="`title-${item.id}`" class="sr-only"
+                                >Nazwa prezentu</label
+                            >
+                            <textarea
+                                :id="`title-${item.id}`"
+                                ref="titleField"
+                                :value="item.title"
+                                rows="2"
+                                maxlength="500"
+                                class="skin-display field-sizing-content w-full resize-none bg-transparent text-[21px] leading-tight text-ink"
+                                @blur="saveTitle"
+                                @keydown.enter.prevent="blurOnEnter"
+                                @keydown.esc="editingTitle = false"
+                            ></textarea>
+                        </template>
+                        <button
+                            v-else-if="editable"
+                            type="button"
+                            :title="item.title"
+                            :aria-label="`Zmień nazwę: ${item.title}`"
+                            class="skin-display line-clamp-3 cursor-text text-left text-[21px] leading-tight text-ink"
+                            @click="startEditingTitle"
+                        >
+                            {{ item.title }}
+                        </button>
+                        <p
+                            v-else
+                            :title="item.title"
+                            class="skin-display line-clamp-3 text-[21px] leading-tight text-ink"
+                        >
+                            {{ item.title }}
+                        </p>
+                    </div>
+                    <button
+                        v-if="editable"
+                        type="button"
+                        :aria-pressed="item.priority"
+                        :aria-label="
+                            item.priority
+                                ? 'Bardzo chcę (kliknij, aby zdjąć)'
+                                : 'Oznacz: bardzo chcę'
+                        "
+                        :title="
+                            item.priority
+                                ? 'Bardzo chcę'
+                                : 'Oznacz: bardzo chcę'
+                        "
+                        class="-mt-1 -mr-2 flex h-11 w-11 flex-none items-center justify-center"
+                        :class="item.priority ? 'text-accent' : 'text-muted'"
+                        @click="togglePriority"
                     >
-                    <textarea
-                        :id="`title-${item.id}`"
-                        ref="titleField"
-                        :value="item.title"
-                        rows="2"
-                        maxlength="500"
-                        class="skin-display field-sizing-content w-full resize-none bg-transparent text-[21px] leading-tight text-ink"
-                        @blur="saveTitle"
-                        @keydown.enter.prevent="blurOnEnter"
-                        @keydown.esc="editingTitle = false"
-                    ></textarea>
-                </template>
-                <button
-                    v-else-if="editable"
-                    type="button"
-                    :title="item.title"
-                    :aria-label="`Zmień nazwę: ${item.title}`"
-                    class="skin-display line-clamp-3 cursor-text text-left text-[21px] leading-tight text-ink"
-                    @click="startEditingTitle"
-                >
-                    {{ item.title }}
-                </button>
-                <p
-                    v-else
-                    :title="item.title"
-                    class="skin-display line-clamp-3 text-[21px] leading-tight text-ink"
-                >
-                    {{ item.title }}
-                </p>
+                        <svg
+                            aria-hidden="true"
+                            width="22"
+                            height="22"
+                            viewBox="0 0 24 24"
+                            :fill="item.priority ? 'currentColor' : 'none'"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linejoin="round"
+                        >
+                            <path
+                                d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9Z"
+                            />
+                        </svg>
+                    </button>
+                    <span
+                        v-else-if="item.priority"
+                        class="flex-none rounded-control bg-accent px-2 py-1 text-xs font-semibold text-on-accent"
+                        >Bardzo chcę</span
+                    >
+                </div>
+
                 <a
                     v-if="item.url"
                     :href="item.url"
@@ -143,7 +237,44 @@ function blurOnEnter(event: KeyboardEvent): void {
                     class="truncate text-sm text-muted underline underline-offset-4"
                     >{{ item.shop ?? 'otwórz stronę' }}</a
                 >
+
+                <template v-if="editable && editingNote">
+                    <label :for="`note-${item.id}`" class="sr-only"
+                        >Notatka</label
+                    >
+                    <textarea
+                        :id="`note-${item.id}`"
+                        ref="noteField"
+                        :value="item.note ?? ''"
+                        rows="2"
+                        maxlength="2000"
+                        placeholder="Rozmiar, kolor, wariant…"
+                        class="skin-outline field-sizing-content w-full resize-none rounded-control bg-surface px-2.5 py-2 text-sm text-ink placeholder:text-muted"
+                        @blur="saveNote"
+                        @keydown.esc="editingNote = false"
+                    ></textarea>
+                </template>
+                <button
+                    v-else-if="editable"
+                    type="button"
+                    class="line-clamp-2 text-left text-sm"
+                    :class="
+                        item.note
+                            ? 'text-ink'
+                            : 'text-muted underline underline-offset-4'
+                    "
+                    @click="startEditingNote"
+                >
+                    {{ item.note ?? 'Dodaj notatkę' }}
+                </button>
+                <p
+                    v-else-if="item.note"
+                    class="text-sm whitespace-pre-line text-ink"
+                >
+                    {{ item.note }}
+                </p>
             </div>
+
             <div
                 class="flex items-center gap-3"
                 :class="rows ? 'flex-[0_1_13rem]' : 'mt-auto justify-between'"
@@ -154,59 +285,81 @@ function blurOnEnter(event: KeyboardEvent): void {
                 >
                     {{ item.price ?? '' }}
                 </p>
-                <label v-if="editable" :for="`price-${item.id}`" class="sr-only"
-                    >Cena</label
-                >
-                <input
-                    v-if="editable"
-                    :id="`price-${item.id}`"
-                    :key="item.price ?? ''"
-                    type="text"
-                    :value="item.price ?? ''"
-                    maxlength="64"
-                    placeholder="cena"
-                    class="h-11 min-w-0 flex-1 bg-transparent text-base font-semibold text-ink placeholder:font-normal placeholder:text-muted"
-                    @blur="savePrice"
-                    @keydown.enter="blurOnEnter"
-                />
-                <button
-                    v-if="editable"
-                    type="button"
-                    :aria-label="`Usuń: ${item.title}`"
-                    class="skin-outline flex h-11 w-11 flex-none items-center justify-center rounded-control bg-surface text-ink"
-                    @click="remove"
-                >
-                    <svg
-                        aria-hidden="true"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1.8"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
+                <template v-else>
+                    <label :for="`price-${item.id}`" class="sr-only"
+                        >Cena</label
                     >
-                        <path d="M3 6h18" />
-                        <path d="M8 6V4h8v2" />
-                        <path d="M6 6l1 14h10l1-14" />
-                    </svg>
-                </button>
+                    <input
+                        :id="`price-${item.id}`"
+                        :key="item.price ?? ''"
+                        type="text"
+                        :value="item.price ?? ''"
+                        maxlength="64"
+                        placeholder="cena"
+                        class="h-11 min-w-0 flex-1 bg-transparent text-base font-semibold text-ink placeholder:font-normal placeholder:text-muted"
+                        @blur="savePrice"
+                        @keydown.enter="blurOnEnter"
+                    />
+                    <button
+                        v-if="draggable"
+                        type="button"
+                        aria-label="Przeciągnij, aby zmienić kolejność"
+                        title="Przeciągnij, aby zmienić kolejność"
+                        class="drag-handle skin-outline flex h-11 w-11 flex-none cursor-grab items-center justify-center rounded-control bg-surface text-ink active:cursor-grabbing"
+                    >
+                        <svg
+                            aria-hidden="true"
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                        >
+                            <circle cx="9" cy="6" r="1.6" />
+                            <circle cx="15" cy="6" r="1.6" />
+                            <circle cx="9" cy="12" r="1.6" />
+                            <circle cx="15" cy="12" r="1.6" />
+                            <circle cx="9" cy="18" r="1.6" />
+                            <circle cx="15" cy="18" r="1.6" />
+                        </svg>
+                    </button>
+                    <button
+                        type="button"
+                        :aria-label="`Usuń: ${item.title}`"
+                        class="skin-outline flex h-11 w-11 flex-none items-center justify-center rounded-control bg-surface text-ink"
+                        @click="remove"
+                    >
+                        <svg
+                            aria-hidden="true"
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M3 6h18" />
+                            <path d="M8 6V4h8v2" />
+                            <path d="M6 6l1 14h10l1-14" />
+                        </svg>
+                    </button>
+                </template>
             </div>
+
             <div
                 v-if="!editable"
                 class="flex flex-wrap items-center gap-2"
                 :class="rows ? 'flex-[0_1_14rem]' : ''"
             >
-                <template v-if="item.reservation === null">
-                    <button
-                        type="button"
-                        class="skin-outline h-11 flex-1 rounded-control bg-accent px-4 text-[15px] font-semibold text-on-accent"
-                        @click="emit('reserve', item)"
-                    >
-                        Rezerwuję
-                    </button>
-                </template>
+                <button
+                    v-if="item.reservation === null"
+                    type="button"
+                    class="skin-outline h-11 flex-1 rounded-control bg-accent px-4 text-[15px] font-semibold text-on-accent"
+                    @click="emit('reserve', item)"
+                >
+                    Rezerwuję
+                </button>
                 <template v-else-if="item.reservation.mine">
                     <p class="flex-1 text-sm font-semibold">
                         Zarezerwowane przez Ciebie

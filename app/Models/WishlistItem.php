@@ -16,13 +16,26 @@ use Illuminate\Support\Carbon;
  * @property string|null $shop
  * @property string|null $image_url
  * @property string|null $price
+ * @property string|null $note
+ * @property bool $priority
+ * @property string|null $image_path
  * @property int $position
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['url', 'title', 'shop', 'image_url', 'price', 'position'])]
+#[Fillable(['url', 'title', 'shop', 'image_url', 'image_path', 'price', 'note', 'priority', 'position'])]
 class WishlistItem extends Model
 {
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'priority' => 'boolean',
+        ];
+    }
+
     /**
      * @return BelongsTo<Wishlist, $this>
      */

@@ -19,10 +19,13 @@ use Illuminate\Support\Str;
  * @property string $title
  * @property Theme $theme
  * @property Layout $layout
+ * @property Carbon|null $event_date
+ * @property string|null $accent
+ * @property string|null $pin_hash
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'draft_token', 'title', 'theme', 'layout'])]
+#[Fillable(['user_id', 'draft_token', 'title', 'theme', 'layout', 'event_date', 'accent', 'pin_hash'])]
 class Wishlist extends Model
 {
     public const DEFAULT_TITLE = 'Moja lista';
@@ -66,6 +69,7 @@ class Wishlist extends Model
         return [
             'theme' => Theme::class,
             'layout' => Layout::class,
+            'event_date' => 'date',
         ];
     }
 }

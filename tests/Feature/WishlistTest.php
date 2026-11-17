@@ -17,7 +17,7 @@ class WishlistTest extends TestCase
 
     public function test_changing_the_title_creates_a_draft_list(): void
     {
-        $response = $this->patch(route('wishlist.update'), ['title' => 'Święta']);
+        $response = $this->patch(route('wishlist.update-current'), ['title' => 'Święta']);
 
         $response->assertRedirect();
         $response->assertCookie(CurrentWishlist::COOKIE);
@@ -28,7 +28,7 @@ class WishlistTest extends TestCase
     {
         Http::preventStrayRequests();
 
-        $this->post(route('items.store'), ['url' => 'https://sklep.invalid/produkt'])->assertRedirect();
+        $this->post(route('items.store-current'), ['url' => 'https://sklep.invalid/produkt'])->assertRedirect();
 
         $this->assertDatabaseHas('wishlist_items', [
             'title' => 'sklep.invalid',
@@ -40,7 +40,7 @@ class WishlistTest extends TestCase
     {
         Http::preventStrayRequests();
 
-        $this->post(route('items.store'), [
+        $this->post(route('items.store-current'), [
             'url' => 'https://sklep.invalid/produkt',
             'title' => 'Bardzo długa nazwa prezentu, którą użytkownik poprawił w oknie potwierdzenia',
             'price' => '349 zł',
@@ -67,7 +67,7 @@ class WishlistTest extends TestCase
     {
         Http::preventStrayRequests();
 
-        $response = $this->post(route('items.store'), ['url' => 'https://sklep.invalid/produkt', 'title' => 'Koc']);
+        $response = $this->post(route('items.store-current'), ['url' => 'https://sklep.invalid/produkt', 'title' => 'Koc']);
 
         $wishlist = Wishlist::query()->sole();
         $response->assertRedirect(route('wishlist.show', $wishlist));
@@ -112,7 +112,7 @@ class WishlistTest extends TestCase
 
         $url = URL::temporarySignedRoute('login.verify', now()->addMinutes(5), [
             'user' => $user->id,
-            'w' => $wishlist->id,
+            'd' => hash('sha256', 'moj-token'),
             'n' => 'jednorazowy',
         ]);
 

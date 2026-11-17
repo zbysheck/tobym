@@ -37,14 +37,14 @@ class LoginLinkController extends Controller
             ['name' => Str::before($email, '@'), 'password' => Str::random(40)],
         );
 
-        // Numer szkicu jedzie w podpisanym linku, żeby lista trafiła na konto
+        // Skrót tokenu szkiców jedzie w podpisanym linku, żeby listy trafiły na konto
         // także wtedy, gdy mail zostanie otwarty w innej przeglądarce.
         // "n" czyni link jednorazowym: po użyciu trafia do cache i drugi raz nie zadziała.
         $parameters = ['user' => $user->id, 'n' => Str::random(20)];
-        $draft = $current->draft($request);
+        $draftHash = $current->draftHash($request);
 
-        if ($draft !== null) {
-            $parameters['w'] = $draft->id;
+        if ($draftHash !== null) {
+            $parameters['d'] = $draftHash;
         }
 
         $url = URL::temporarySignedRoute('login.verify', now()->addMinutes(self::LINK_MINUTES), $parameters);
@@ -71,15 +71,15 @@ class LoginLinkController extends Controller
             return redirect()->route('home')->with('status', 'Ten link został już użyty. Podaj maila jeszcze raz, wyślemy nowy.');
         }
 
-        $draftIds = array_filter([$request->integer('w'), $current->draft($request)?->id]);
+        $draftHashes = array_values(array_filter([$request->string('d')->toString(), $current->draftHash($request)]));
 
         Auth::login($user, remember: true);
         $request->session()->regenerate();
 
-        if ($draftIds !== []) {
+        if ($draftHashes !== []) {
             Wishlist::query()
-                ->whereKey($draftIds)
                 ->whereNull('user_id')
+                ->whereIn('draft_token', $draftHashes)
                 ->update(['user_id' => $user->id, 'draft_token' => null]);
         }
 
