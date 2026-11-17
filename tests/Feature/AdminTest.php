@@ -43,6 +43,9 @@ class AdminTest extends TestCase
         $this->get(route('admin.dashboard'))->assertNotFound();
 
         $this->actingAs(User::factory()->create())->get(route('admin.dashboard'))->assertNotFound();
+
+        // Belka admina na stronie nie pojawia się zwykłym użytkownikom.
+        $this->get(route('my-lists'))->assertInertia(fn (Assert $page) => $page->where('auth.isAdmin', false));
     }
 
     public function test_the_admin_sees_every_page(): void

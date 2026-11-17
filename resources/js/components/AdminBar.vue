@@ -27,7 +27,7 @@ function stop(): void {
 
 onMounted(() => {
     if (isAdmin.value) {
-        document.body.style.paddingTop = '2.5rem';
+        document.body.style.paddingTop = '1.5rem';
     }
 });
 
@@ -39,15 +39,15 @@ onBeforeUnmount(() => {
 <template>
     <Teleport v-if="isAdmin" to="body">
         <div
-            class="fixed inset-x-0 top-0 z-50 flex h-10 items-center gap-3 overflow-x-auto px-4 font-sans text-[13px] whitespace-nowrap shadow-md"
+            class="fixed inset-x-0 top-0 z-50 flex h-6 items-center gap-2.5 overflow-x-auto px-3 font-mono text-[11px] leading-none whitespace-nowrap"
             :class="
                 viewingAs
                     ? 'bg-amber-400 text-black'
-                    : 'bg-neutral-900 text-neutral-100'
+                    : 'bg-neutral-900/90 text-neutral-300'
             "
         >
             <span
-                class="rounded px-1.5 py-0.5 text-[11px] font-bold tracking-wide uppercase"
+                class="rounded-sm px-1 py-px text-[10px] font-bold uppercase"
                 :class="
                     viewingAs
                         ? 'bg-black text-amber-300'
@@ -63,7 +63,7 @@ onBeforeUnmount(() => {
                 >
                 <button
                     type="button"
-                    class="rounded bg-black px-2.5 py-1 font-semibold text-white"
+                    class="rounded-sm bg-black px-1.5 py-0.5 font-semibold text-white"
                     @click="stop"
                 >
                     Wróć do siebie
@@ -101,11 +101,12 @@ onBeforeUnmount(() => {
                         class="hover:underline"
                         >Zdarzenia tej listy</a
                     >
-                    <span v-if="guestPreview" class="ml-auto opacity-70"
-                        >Podgląd gościa (bez PIN-u)</span
+                    <span v-if="guestPreview" class="opacity-70"
+                        >podgląd gościa, bez PIN-u</span
                     >
                 </template>
             </template>
+            <span class="ml-auto pl-4 opacity-50">{{ page.component }}</span>
         </div>
     </Teleport>
 </template>
