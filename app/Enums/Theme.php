@@ -10,6 +10,7 @@ enum Theme: string
     case Zimowa = 'zimowa';
     case Slubna = 'slubna';
     case Urodzinowa = 'urodzinowa';
+    case Kotki = 'kotki';
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum Theme: string
             self::Zimowa => 'Święta: zima',
             self::Slubna => 'Ślub',
             self::Urodzinowa => 'Urodziny',
+            self::Kotki => 'Kotki',
         };
     }
 }

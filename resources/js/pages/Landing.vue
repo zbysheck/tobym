@@ -38,8 +38,8 @@ const steps = [
 
 const features = [
     {
-        title: 'Działa z każdym sklepem',
-        text: 'Duże sklepy i małe butiki. Gdy jakiegoś sklepu nie znamy, uczymy się go przy pierwszym linku.',
+        title: 'Link z dowolnego sklepu',
+        text: 'Nazwę, cenę i zdjęcie uzupełniamy sami. Gdy sklep ich nie pokazuje, wystarczy nazwa i link, a wtyczka Tobym dociągnie resztę.',
     },
     {
         title: 'Niespodzianka zostaje niespodzianką',
@@ -47,7 +47,7 @@ const features = [
     },
     {
         title: 'Skórki na każdą okazję',
-        text: 'Choinka, Mikołaj, zimowa, ślubna, urodzinowa. Do tego Twój własny kolor.',
+        text: 'Choinka, Mikołaj, zimowa, ślubna, urodzinowa i słodkie kotki. Do tego Twój własny kolor.',
     },
     {
         title: 'Kilka list naraz',
@@ -70,6 +70,7 @@ const themes = [
     { value: 'zimowa', label: 'Zima' },
     { value: 'slubna', label: 'Ślub' },
     { value: 'urodzinowa', label: 'Urodziny' },
+    { value: 'kotki', label: 'Kotki' },
 ];
 
 const preview = [

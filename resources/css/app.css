@@ -229,6 +229,47 @@
     --skin-shadow-card: 6px 6px 0 #17142b;
 }
 
+[data-theme='kotki'] {
+    --skin-font-display: 'Fredoka', 'Nunito', system-ui, sans-serif;
+    --skin-font-body: 'Nunito', system-ui, sans-serif;
+    --skin-display-weight: 600;
+    --skin-display-style: normal;
+    --skin-display-tracking: 0;
+    --skin-title-size: clamp(3rem, 8vw, 5.25rem);
+    --skin-hero-align: center;
+    --skin-hero-text: center;
+
+    --skin-ground: #fff6f8;
+    --skin-surface: #ffffff;
+    --skin-tile: #ffe6ee;
+    --skin-ink: #4a2c3a;
+    --skin-muted: #85606f;
+    --skin-line: #f3cdd9;
+    --skin-accent: #c2416f;
+    --skin-on-accent: #ffffff;
+    --skin-band: #ffd9e5;
+    --skin-on-band: #4a2c3a;
+
+    --skin-border-width: 2px;
+    --skin-radius-card: 26px;
+    --skin-radius-control: 999px;
+    --skin-shadow-card: 0 10px 26px -16px rgb(194 65 111 / 0.45);
+    --skin-card-top-width: 6px;
+    --skin-card-top-color: #f59bb8;
+
+    --skin-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='%23c2416f' fill-opacity='0.08'%3E%3Cg transform='translate(26 30) rotate(-18) scale(1)'%3E%3Cellipse cy='4' rx='6' ry='5'/%3E%3Ccircle cx='-6.5' cy='-4' r='2.4'/%3E%3Ccircle cx='-2.3' cy='-7.6' r='2.4'/%3E%3Ccircle cx='2.3' cy='-7.6' r='2.4'/%3E%3Ccircle cx='6.5' cy='-4' r='2.4'/%3E%3C/g%3E%3Cg transform='translate(86 84) rotate(16) scale(0.8)'%3E%3Cellipse cy='4' rx='6' ry='5'/%3E%3Ccircle cx='-6.5' cy='-4' r='2.4'/%3E%3Ccircle cx='-2.3' cy='-7.6' r='2.4'/%3E%3Ccircle cx='2.3' cy='-7.6' r='2.4'/%3E%3Ccircle cx='6.5' cy='-4' r='2.4'/%3E%3C/g%3E%3C/g%3E%3Cg fill='%23f59bb8' fill-opacity='0.35'%3E%3Cpath transform='translate(92 26) scale(1)' d='M0 4C-7-1-4-8 0-3.5C4-8 7-1 0 4Z'/%3E%3Cpath transform='translate(28 92) scale(0.8)' d='M0 4C-7-1-4-8 0-3.5C4-8 7-1 0 4Z'/%3E%3C/g%3E%3C/svg%3E");
+    --skin-pattern-size: 220px;
+    --skin-ornament: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='76' viewBox='0 0 140 76'%3E%3Cg stroke='%234a2c3a' stroke-width='2.5' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M40 34L45 7L64 24Z' fill='%23ffe6ee'/%3E%3Cpath d='M100 34L95 7L76 24Z' fill='%23ffe6ee'/%3E%3Cellipse cx='70' cy='46' rx='34' ry='25' fill='%23ffe6ee'/%3E%3C/g%3E%3Cg fill='%23f59bb8'%3E%3Cpath d='M45 26L47.5 14L56 22Z'/%3E%3Cpath d='M95 26L92.5 14L84 22Z'/%3E%3Ccircle cx='51' cy='54' r='4.5' fill-opacity='0.6'/%3E%3Ccircle cx='89' cy='54' r='4.5' fill-opacity='0.6'/%3E%3Cpath d='M66.5 51h7l-3.5 3.5z'/%3E%3C/g%3E%3Cg fill='none' stroke='%234a2c3a' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M54 45q5-6 10 0M76 45q5-6 10 0'/%3E%3Cpath d='M70 54.5q-2.5 4.5-6 2.5M70 54.5q2.5 4.5 6 2.5'/%3E%3Cpath d='M38 49H22M39 56l-15 4M102 49h16M101 56l15 4' stroke-width='1.8'/%3E%3C/g%3E%3Cpath d='M58 70l-10-6v12zM82 70l10-6v12z' fill='%23c2416f'/%3E%3Ccircle cx='70' cy='70' r='4' fill='%23c2416f'/%3E%3C/svg%3E");
+    --skin-ornament-width: 140px;
+    --skin-ornament-height: 76px;
+    --skin-band-stripe: repeating-linear-gradient(
+        90deg,
+        #f59bb8 0 18px,
+        #ffe6ee 18px 36px
+    );
+    --skin-band-stripe-height: 6px;
+}
+
 @layer components {
     .skin-display {
         font-family: var(--skin-font-display);

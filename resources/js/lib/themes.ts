@@ -6,6 +6,7 @@ const FONTS: Record<string, string> = {
     zimowa: 'josefin-sans:300,600|nunito:400,600,700',
     slubna: 'cormorant-garamond:500,500i|jost:400,500',
     urodzinowa: 'bricolage-grotesque:800|inter:400,600,700',
+    kotki: 'fredoka:500,600|nunito:400,600,700',
 };
 
 export function themeFontsUrl(theme: string): string {
