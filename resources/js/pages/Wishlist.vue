@@ -16,6 +16,8 @@ type SortKey = 'added' | 'newest' | 'price-asc' | 'price-desc' | 'name';
 const props = defineProps<{
     wishlist: WishlistData;
     themes: ThemeOption[];
+    editable: boolean;
+    shareUrl: string | null;
 }>();
 
 const sortOptions: { value: SortKey; label: string }[] = [
@@ -262,6 +264,28 @@ function sendLink(): void {
     );
 }
 
+const copied = ref(false);
+
+async function copyLink(): Promise<void> {
+    if (props.shareUrl === null) {
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(props.shareUrl);
+        copied.value = true;
+        window.setTimeout(() => {
+            copied.value = false;
+        }, 2000);
+    } catch {
+        window.prompt('Skopiuj link do listy:', props.shareUrl);
+    }
+}
+
+function onThemeChange(event: Event): void {
+    setTheme((event.target as HTMLSelectElement).value);
+}
+
 function logout(): void {
     router.post('/logout');
 }
@@ -285,7 +309,7 @@ function blurOnEnter(event: KeyboardEvent): void {
         class="min-h-screen bg-ground font-body text-ink antialiased"
     >
         <div
-            v-if="!user"
+            v-if="!user && editable"
             class="skin-outline border-x-0 border-t-0 bg-band text-on-band"
         >
             <form
@@ -356,24 +380,35 @@ function blurOnEnter(event: KeyboardEvent): void {
             </p>
 
             <section class="skin-hero flex flex-col gap-3 pt-6 pb-9">
-                <label for="list-title" class="sr-only">Nazwa listy</label>
-                <input
-                    id="list-title"
-                    :key="wishlist.title"
-                    type="text"
-                    :value="wishlist.title"
-                    maxlength="120"
-                    class="skin-display skin-title w-full bg-transparent text-ink outline-offset-8"
-                    @blur="saveTitle"
-                    @keydown.enter="blurOnEnter"
-                />
+                <template v-if="editable">
+                    <label for="list-title" class="sr-only">Nazwa listy</label>
+                    <input
+                        id="list-title"
+                        :key="wishlist.title"
+                        type="text"
+                        :value="wishlist.title"
+                        maxlength="120"
+                        class="skin-display skin-title w-full bg-transparent text-ink outline-offset-8"
+                        @blur="saveTitle"
+                        @keydown.enter="blurOnEnter"
+                    />
+                </template>
+                <h1 v-else class="skin-display skin-title text-ink">
+                    {{ wishlist.title }}
+                </h1>
                 <p class="text-[17px] text-muted">{{ countLabel }}</p>
             </section>
 
             <div
-                class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start"
+                class="grid gap-8"
+                :class="
+                    editable
+                        ? 'lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start'
+                        : ''
+                "
             >
                 <aside
+                    v-if="editable"
                     class="flex flex-col gap-6 lg:sticky lg:top-6 lg:order-2"
                     aria-label="Opcje listy"
                 >
@@ -436,31 +471,42 @@ function blurOnEnter(event: KeyboardEvent): void {
                         </div>
                     </div>
 
-                    <div
-                        role="group"
-                        aria-labelledby="theme-heading"
-                        class="flex flex-col gap-2.5"
-                    >
-                        <h2 id="theme-heading" class="text-sm font-semibold">
-                            Skórka
-                        </h2>
-                        <div class="flex flex-col gap-2">
-                            <button
+                    <div class="flex flex-col gap-2.5">
+                        <label for="list-theme" class="text-sm font-semibold"
+                            >Skórka</label
+                        >
+                        <select
+                            id="list-theme"
+                            :value="theme"
+                            class="skin-outline h-11 w-full rounded-control bg-surface px-3 text-[15px] text-ink"
+                            @change="onThemeChange"
+                        >
+                            <option
                                 v-for="option in themes"
                                 :key="option.value"
-                                type="button"
-                                :aria-pressed="option.value === theme"
-                                class="skin-outline h-11 rounded-control px-4 text-left text-sm font-semibold"
-                                :class="
-                                    option.value === theme
-                                        ? 'bg-ink text-ground'
-                                        : 'bg-surface text-ink'
-                                "
-                                @click="setTheme(option.value)"
+                                :value="option.value"
                             >
                                 {{ option.label }}
-                            </button>
-                        </div>
+                            </option>
+                        </select>
+                    </div>
+
+                    <div v-if="shareUrl" class="flex flex-col gap-2.5">
+                        <h2 class="text-sm font-semibold">Udostępnij</h2>
+                        <button
+                            type="button"
+                            class="skin-outline h-11 rounded-control bg-surface px-4 text-sm font-semibold text-ink"
+                            @click="copyLink"
+                        >
+                            {{
+                                copied
+                                    ? 'Skopiowano link'
+                                    : 'Kopiuj link do listy'
+                            }}
+                        </button>
+                        <p class="text-xs break-all text-muted">
+                            {{ shareUrl }}
+                        </p>
                     </div>
                 </aside>
 
@@ -533,8 +579,11 @@ function blurOnEnter(event: KeyboardEvent): void {
                         v-if="wishlist.items.length === 0"
                         class="skin-outline rounded-card bg-surface p-8 text-center text-[17px] text-muted"
                     >
-                        Wklej link do pierwszego prezentu w polu „Dodaj
-                        prezent”.
+                        <template v-if="editable"
+                            >Wklej link do pierwszego prezentu w polu „Dodaj
+                            prezent”.</template
+                        >
+                        <template v-else>Ta lista jest jeszcze pusta.</template>
                     </p>
                     <p
                         v-else-if="visibleItems.length === 0"
@@ -558,6 +607,7 @@ function blurOnEnter(event: KeyboardEvent): void {
                             :key="item.id"
                             :item="item"
                             :layout="layout"
+                            :editable="editable"
                         />
                     </TransitionGroup>
                 </main>

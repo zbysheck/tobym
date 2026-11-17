@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import type { WishlistItem, WishlistLayout } from '@/types';
 
 const props = defineProps<{
     item: WishlistItem;
     layout: WishlistLayout;
+    editable: boolean;
 }>();
 
 const rows = computed(() => props.layout === 'rows');
+const editingTitle = ref(false);
+const titleField = ref<HTMLTextAreaElement | null>(null);
+
+async function startEditingTitle(): Promise<void> {
+    editingTitle.value = true;
+    await nextTick();
+    titleField.value?.focus();
+}
 
 function fieldValue(event: Event): string {
     return (
@@ -17,6 +26,7 @@ function fieldValue(event: Event): string {
 }
 
 function saveTitle(event: Event): void {
+    editingTitle.value = false;
     const title = fieldValue(event);
 
     if (title !== '' && title !== props.item.title) {
@@ -82,19 +92,39 @@ function blurOnEnter(event: KeyboardEvent): void {
                 class="flex min-w-0 flex-col gap-1"
                 :class="rows ? 'flex-[1_1_14rem]' : ''"
             >
-                <label :for="`title-${item.id}`" class="sr-only"
-                    >Nazwa prezentu</label
+                <template v-if="editable && editingTitle">
+                    <label :for="`title-${item.id}`" class="sr-only"
+                        >Nazwa prezentu</label
+                    >
+                    <textarea
+                        :id="`title-${item.id}`"
+                        ref="titleField"
+                        :value="item.title"
+                        rows="2"
+                        maxlength="500"
+                        class="skin-display field-sizing-content w-full resize-none bg-transparent text-[21px] leading-tight text-ink"
+                        @blur="saveTitle"
+                        @keydown.enter.prevent="blurOnEnter"
+                        @keydown.esc="editingTitle = false"
+                    ></textarea>
+                </template>
+                <button
+                    v-else-if="editable"
+                    type="button"
+                    :title="item.title"
+                    :aria-label="`Zmień nazwę: ${item.title}`"
+                    class="skin-display line-clamp-3 cursor-text text-left text-[21px] leading-tight text-ink"
+                    @click="startEditingTitle"
                 >
-                <textarea
-                    :id="`title-${item.id}`"
-                    :key="item.title"
-                    :value="item.title"
-                    rows="2"
-                    maxlength="500"
-                    class="skin-display field-sizing-content w-full resize-none bg-transparent text-[21px] leading-tight text-ink"
-                    @blur="saveTitle"
-                    @keydown.enter.prevent="blurOnEnter"
-                ></textarea>
+                    {{ item.title }}
+                </button>
+                <p
+                    v-else
+                    :title="item.title"
+                    class="skin-display line-clamp-3 text-[21px] leading-tight text-ink"
+                >
+                    {{ item.title }}
+                </p>
                 <a
                     v-if="item.url"
                     :href="item.url"
@@ -108,8 +138,17 @@ function blurOnEnter(event: KeyboardEvent): void {
                 class="flex items-center gap-3"
                 :class="rows ? 'flex-[0_1_13rem]' : 'mt-auto justify-between'"
             >
-                <label :for="`price-${item.id}`" class="sr-only">Cena</label>
+                <p
+                    v-if="!editable"
+                    class="min-w-0 flex-1 text-base font-semibold text-ink"
+                >
+                    {{ item.price ?? '' }}
+                </p>
+                <label v-if="editable" :for="`price-${item.id}`" class="sr-only"
+                    >Cena</label
+                >
                 <input
+                    v-if="editable"
                     :id="`price-${item.id}`"
                     :key="item.price ?? ''"
                     type="text"
@@ -121,6 +160,7 @@ function blurOnEnter(event: KeyboardEvent): void {
                     @keydown.enter="blurOnEnter"
                 />
                 <button
+                    v-if="editable"
                     type="button"
                     :aria-label="`Usuń: ${item.title}`"
                     class="skin-outline flex h-11 w-11 flex-none items-center justify-center rounded-control bg-surface text-ink"

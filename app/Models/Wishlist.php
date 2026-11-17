@@ -9,9 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * @property int $id
+ * @property string $slug
  * @property int|null $user_id
  * @property string|null $draft_token
  * @property string $title
@@ -24,6 +26,21 @@ use Illuminate\Support\Carbon;
 class Wishlist extends Model
 {
     public const DEFAULT_TITLE = 'Moja lista';
+
+    protected static function booted(): void
+    {
+        static::creating(function (Wishlist $wishlist): void {
+            // Losowy, trudny do zgadnięcia adres listy: /l/{slug}.
+            if (($wishlist->getAttributes()['slug'] ?? null) === null) {
+                $wishlist->slug = strtolower(Str::random(10));
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
 
     /**
      * @return BelongsTo<User, $this>

@@ -63,6 +63,30 @@ class WishlistTest extends TestCase
         $this->assertDatabaseCount('wishlist_items', 0);
     }
 
+    public function test_the_first_gift_moves_the_list_to_its_own_address(): void
+    {
+        Http::preventStrayRequests();
+
+        $response = $this->post(route('items.store'), ['url' => 'https://sklep.invalid/produkt', 'title' => 'Koc']);
+
+        $wishlist = Wishlist::query()->sole();
+        $response->assertRedirect(route('wishlist.show', $wishlist));
+        $this->assertMatchesRegularExpression('/^[a-z0-9]{10}$/', $wishlist->slug);
+    }
+
+    public function test_someone_else_sees_the_list_read_only(): void
+    {
+        $wishlist = Wishlist::query()->create([
+            'title' => 'Cudza lista',
+            'theme' => Theme::Slubna,
+            'draft_token' => hash('sha256', 'cudzy-token'),
+        ]);
+
+        $this->get(route('wishlist.show', $wishlist))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Wishlist')->where('editable', false));
+    }
+
     public function test_an_item_from_another_list_cannot_be_deleted(): void
     {
         $wishlist = Wishlist::query()->create([

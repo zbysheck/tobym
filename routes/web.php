@@ -5,7 +5,8 @@ use App\Http\Controllers\WishlistController;
 use App\Http\Controllers\WishlistItemController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [WishlistController::class, 'show'])->name('home');
+Route::get('/', [WishlistController::class, 'home'])->name('home');
+Route::get('/l/{wishlist}', [WishlistController::class, 'show'])->name('wishlist.show');
 Route::patch('/list', [WishlistController::class, 'update'])->name('wishlist.update');
 
 Route::post('/items/preview', [WishlistItemController::class, 'preview'])->middleware('throttle:30,1')->name('items.preview');

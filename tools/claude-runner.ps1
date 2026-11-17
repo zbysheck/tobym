@@ -1,7 +1,7 @@
 # Runner dla Claude'a: wykonuje z gory ustalone komendy projektu.
 # Claude zapisuje storage/app/runner/request.json, a ten skrypt uruchamia komende
 # i zapisuje wynik w storage/app/runner/<id>.txt (ostatnia linia: EXIT <kod>).
-# Dozwolone sa tylko akcje z listy w Invoke-Action. Zamknij okno, zeby to wylaczyc.
+# Akcja 'run' wykonuje DOWOLNA komende (tymczasowo, na prosbe uzytkownika). Zamknij okno, zeby to wylaczyc.
 
 $ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot
@@ -39,12 +39,24 @@ function Invoke-Action($req) {
             if ($a.Count -lt 2 -or $a[0] -notmatch '^[A-Z][A-Z0-9_]*$' -or $a[1] -notmatch '^[\w.,:/@\-]{0,200}$') { throw 'Zla zmienna' }
             ssh $sshHost "bash $appPath/deploy/set-env.sh $($a[0]) '$($a[1])'"
         }
+        'server-probe' {
+            if ($a.Count -lt 1 -or $a[0] -notmatch '^https?://[^\s"''`$\\]+$') { throw 'Zly adres strony' }
+            ssh $sshHost "cd $appPath && php artisan tobym:probe '$($a[0])' --fresh"
+        }
+        'server-log' { ssh $sshHost "tail -n 80 $appPath/storage/logs/laravel.log" }
+        'run' {
+            # Dowolna komenda w katalogu projektu (wlaczone na prosbe uzytkownika, tymczasowo).
+            if ($a.Count -lt 1 -or "$($a[0])".Trim() -eq '') { throw 'Pusta komenda' }
+            $script = Join-Path $dir "run-$($req.id).cmd"
+            Set-Content -Path $script -Encoding Default -Value "@echo off`r`ncd /d `"$root`"`r`n$($a[0])"
+            try { & cmd /c $script } finally { Remove-Item $script -Force -ErrorAction SilentlyContinue }
+        }
         default { throw "Nieznana akcja: $($req.action)" }
     }
 }
 
 Write-Host "Runner Claude'a dziala w $root"
-Write-Host 'Dozwolone: test, types, lint, migrate, probe, ship, deploy, set-env. Zamknij okno, zeby wylaczyc.'
+Write-Host 'Dozwolone: test, types, lint, migrate, probe, ship, deploy, set-env, server-probe, server-log oraz run (dowolna komenda). Zamknij okno, zeby wylaczyc.'
 
 while ($true) {
     if (Test-Path $request) {

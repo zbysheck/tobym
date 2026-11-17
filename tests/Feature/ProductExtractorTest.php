@@ -23,6 +23,7 @@ class ProductExtractorTest extends TestCase
         config(['services.gemini.key' => 'test-key']);
 
         $html = '<html><head><meta property="og:title" content="Koc">'
+            .'<meta property="og:image" content="https://sklep.example/koc.jpg">'
             .'<meta property="product:price:amount" content="189.00">'
             .'<meta property="product:price:currency" content="PLN"></head><body></body></html>';
 

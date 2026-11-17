@@ -47,9 +47,12 @@ class ProductExtractor
         $fields = $this->standardFields($xpath);
         $domain = Urls::host($url);
 
-        if ($domain !== null && ($fields['title'] === null || $fields['price'] === null)) {
+        if ($domain !== null && ! $this->complete($fields)) {
             $fields = $this->withRecipe($fields, $xpath, $html, $url, $domain);
         }
+
+        // Tytuł karty przeglądarki to ostatnia deska ratunku: zwykle ma doklejoną nazwę sklepu.
+        $fields['title'] ??= $this->text($xpath->evaluate('string(//title)'));
 
         if ($fields['title'] !== null) {
             $fields['title'] = Str::limit($fields['title'], 500, '…');
@@ -86,8 +89,7 @@ class ProductExtractor
 
         return [
             'title' => $this->meta($xpath, ['og:title', 'twitter:title'])
-                ?? $this->text($product['name'] ?? null)
-                ?? $this->text($xpath->evaluate('string(//title)')),
+                ?? $this->text($product['name'] ?? null),
             'shop' => $this->meta($xpath, ['og:site_name']),
             'image' => $this->meta($xpath, ['og:image', 'og:image:url', 'twitter:image'])
                 ?? $this->imageFromProduct($product),
@@ -108,7 +110,7 @@ class ProductExtractor
         $saved = $this->normalizeRecipe($record?->recipe);
         $withSaved = $saved === null ? $fields : $this->applyRecipe($fields, $xpath, $html, $saved);
 
-        if ($withSaved['title'] !== null && $withSaved['price'] !== null) {
+        if ($this->complete($withSaved)) {
             return $withSaved;
         }
 
@@ -116,22 +118,59 @@ class ProductExtractor
             return $withSaved;
         }
 
-        $generated = $this->generator->generate($this->condense($html), $this->scriptData($html), $url);
+        $generated = $this->generator->generate($this->condense($html), $this->hints($html), $url);
         $this->lastGenerated = $generated;
 
         if ($generated === null) {
             return $withSaved;
         }
 
-        $withGenerated = $this->applyRecipe($fields, $xpath, $html, $generated);
-        $better = $this->filled($withGenerated) > $this->filled($withSaved);
+        $merged = $saved === null ? $generated : $this->merge($saved, $generated, $xpath, $html);
+        $withMerged = $this->applyRecipe($fields, $xpath, $html, $merged);
+        $better = $this->filled($withMerged) > $this->filled($withSaved);
 
         ExtractionRecipe::query()->updateOrCreate(
             ['domain' => $domain],
-            ['recipe' => $better ? $generated : $saved, 'generated_at' => now()],
+            ['recipe' => $better ? $merged : $saved, 'generated_at' => now()],
         );
 
-        return $better ? $withGenerated : $withSaved;
+        return $better ? $withMerged : $withSaved;
+    }
+
+    /**
+     * Z zapisanego przepisu zostawia to, co nadal działa, a resztę bierze z nowego.
+     *
+     * @param  Recipe  $saved
+     * @param  Recipe  $generated
+     * @return Recipe
+     */
+    private function merge(array $saved, array $generated, DOMXPath $xpath, string $html): array
+    {
+        $merged = $generated;
+
+        foreach (['title', 'image'] as $key) {
+            if ($this->evaluate($xpath, $saved[$key]) !== null) {
+                $merged[$key] = $saved[$key];
+            }
+        }
+
+        $empty = ['title' => null, 'shop' => null, 'image' => null, 'price' => null];
+
+        if ($this->applyRecipe($empty, $xpath, $html, $saved)['price'] !== null) {
+            $merged['price'] = $saved['price'];
+            $merged['price_pattern'] = $saved['price_pattern'];
+            $merged['currency'] = $saved['currency'];
+        }
+
+        return $merged;
+    }
+
+    /**
+     * @param  Fields  $fields
+     */
+    private function complete(array $fields): bool
+    {
+        return $fields['title'] !== null && $fields['price'] !== null && $fields['image'] !== null;
     }
 
     /**
@@ -216,7 +255,7 @@ class ProductExtractor
      */
     private function filled(array $fields): int
     {
-        return (int) ($fields['title'] !== null) + (int) ($fields['price'] !== null);
+        return (int) ($fields['title'] !== null) + (int) ($fields['price'] !== null) + (int) ($fields['image'] !== null);
     }
 
     /**
@@ -243,6 +282,40 @@ class ProductExtractor
         $start = $heading === false ? 0 : max(0, $heading - 3000);
 
         return mb_strcut($clean, $start, self::PROMPT_BYTES, 'UTF-8');
+    }
+
+    /**
+     * Podpowiedzi dla AI spoza widocznego HTML-u: dane ze skryptów i lista obrazków.
+     */
+    public function hints(string $html): string
+    {
+        return "Script data:\n".$this->scriptData($html)."\n\nImage tags:\n".$this->imageCandidates($html);
+    }
+
+    /**
+     * Tagi <img> ze strony, od najbardziej obiecujących (id, data-old-hires, itemprop, "product"/"main" w klasie).
+     * Na długich stronach (np. Amazon) główne zdjęcie bywa daleko od nagłówka, więc nie trafia do wycinka HTML-u.
+     */
+    public function imageCandidates(string $html): string
+    {
+        if (preg_match_all('#<img\b[^>]*>#i', $html, $tags) === false) {
+            return '';
+        }
+
+        $scored = [];
+
+        foreach ($tags[0] as $index => $tag) {
+            $tag = preg_replace('#\s(?:on\w+|style|srcset|sizes|alt)="[^"]*"#i', '', $tag) ?? $tag;
+            $tag = preg_replace('#="([^"]{160})[^"]+"#', '="$1…"', $tag) ?? $tag;
+            $score = preg_match_all('#\b(?:id=|data-old-hires|itemprop=|data-zoom|main|product|gallery|cover|hero)#i', $tag);
+            $scored[] = ['tag' => $tag, 'score' => (int) $score, 'index' => $index];
+        }
+
+        usort($scored, fn (array $a, array $b): int => [$b['score'], $a['index']] <=> [$a['score'], $b['index']]);
+
+        $list = implode("\n", array_unique(array_column(array_slice($scored, 0, 25), 'tag')));
+
+        return mb_strcut($list, 0, 6_000, 'UTF-8');
     }
 
     /**

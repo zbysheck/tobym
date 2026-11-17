@@ -67,7 +67,7 @@ class WishlistItemController extends Controller
             'position' => ((int) $wishlist->items()->max('position')) + 1,
         ]);
 
-        return back();
+        return redirect()->route('wishlist.show', $wishlist);
     }
 
     public function update(Request $request, CurrentWishlist $current, WishlistItem $item): RedirectResponse
