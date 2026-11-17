@@ -20,7 +20,10 @@ class ProductMetadataFetcher
 
     public function __construct(private ProductExtractor $extractor) {}
 
-    public function fetch(string $url): ProductMetadata
+    /**
+     * @param  bool  $allowAi  false = szybko, tylko odczyt strony i zapisane przepisy (bez czekania na AI)
+     */
+    public function fetch(string $url, bool $allowAi = true): ProductMetadata
     {
         $host = Urls::host($url);
         $fallback = new ProductMetadata($host ?? 'Prezent', $host, null, null);
@@ -32,13 +35,14 @@ class ProductMetadataFetcher
                 return $fallback;
             }
 
-            $fields = $this->extractor->extract($html, $url);
+            $fields = $this->extractor->extract($html, $url, $allowAi);
 
             return new ProductMetadata(
                 $fields['title'] ?? $fallback->title,
                 $fields['shop'] ?? $fallback->shop,
                 $fields['image'],
                 $fields['price'],
+                $this->extractor->generationSkipped,
             );
         } catch (Throwable $exception) {
             report($exception);

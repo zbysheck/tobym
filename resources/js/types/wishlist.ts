@@ -27,4 +27,5 @@ export type GiftPreview = {
     shop: string | null;
     image_url: string | null;
     price: string | null;
+    pending: boolean;
 };

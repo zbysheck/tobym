@@ -140,6 +140,51 @@ function xsrfToken(): string {
     return match ? decodeURIComponent(match[1]) : '';
 }
 
+type PreviewResult =
+    | { ok: true; preview: GiftPreview }
+    | { ok: false; error: string };
+
+async function fetchPreview(
+    link: string,
+    deep: boolean,
+): Promise<PreviewResult> {
+    try {
+        const response = await fetch('/items/preview', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-XSRF-TOKEN': xsrfToken(),
+            },
+            body: JSON.stringify({ url: link, deep }),
+        });
+
+        if (response.status === 422) {
+            const body = (await response.json()) as {
+                errors?: Record<string, string[]>;
+            };
+
+            return {
+                ok: false,
+                error: body.errors?.url?.[0] ?? 'Nie udało się odczytać linku.',
+            };
+        }
+
+        if (!response.ok) {
+            return {
+                ok: false,
+                error: 'Nie udało się pobrać danych. Odśwież stronę i spróbuj ponownie.',
+            };
+        }
+
+        return { ok: true, preview: (await response.json()) as GiftPreview };
+    } catch {
+        return { ok: false, error: 'Brak połączenia. Spróbuj ponownie.' };
+    }
+}
+
+const enriching = ref(false);
+
 async function requestPreview(): Promise<void> {
     const link = url.value.trim();
 
@@ -150,40 +195,39 @@ async function requestPreview(): Promise<void> {
     loadingPreview.value = true;
     urlError.value = '';
 
-    try {
-        const response = await fetch('/items/preview', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-                'X-XSRF-TOKEN': xsrfToken(),
-            },
-            body: JSON.stringify({ url: link }),
-        });
+    const quick = await fetchPreview(link, false);
+    loadingPreview.value = false;
 
-        if (response.status === 422) {
-            const body = (await response.json()) as {
-                errors?: Record<string, string[]>;
-            };
-            urlError.value =
-                body.errors?.url?.[0] ?? 'Nie udało się odczytać linku.';
+    if (!quick.ok) {
+        urlError.value = quick.error;
 
-            return;
-        }
-
-        if (!response.ok) {
-            urlError.value =
-                'Nie udało się pobrać danych. Odśwież stronę i spróbuj ponownie.';
-
-            return;
-        }
-
-        preview.value = (await response.json()) as GiftPreview;
-    } catch {
-        urlError.value = 'Brak połączenia. Spróbuj ponownie.';
-    } finally {
-        loadingPreview.value = false;
+        return;
     }
+
+    preview.value = quick.preview;
+
+    if (!quick.preview.pending) {
+        return;
+    }
+
+    // Okno już jest otwarte; AI dociąga brakujące dane w tle.
+    enriching.value = true;
+    const deep = await fetchPreview(link, true);
+    enriching.value = false;
+
+    if (!deep.ok || preview.value?.url !== link) {
+        return;
+    }
+
+    const current = preview.value;
+    preview.value = {
+        ...current,
+        title: deep.preview.title,
+        image_url: current.image_url ?? deep.preview.image_url,
+        price: current.price ?? deep.preview.price,
+        shop: current.shop ?? deep.preview.shop,
+        pending: false,
+    };
 }
 
 function submitLink(): void {
@@ -616,6 +660,7 @@ function blurOnEnter(event: KeyboardEvent): void {
 
         <AddGiftDialog
             :preview="preview"
+            :enriching="enriching"
             :saving="savingGift"
             @confirm="confirmGift"
             @cancel="cancelGift"

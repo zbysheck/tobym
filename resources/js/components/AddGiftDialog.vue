@@ -5,6 +5,7 @@ import type { GiftPreview } from '@/types';
 const props = defineProps<{
     preview: GiftPreview | null;
     saving: boolean;
+    enriching: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -15,21 +16,42 @@ const emit = defineEmits<{
 const dialog = ref<HTMLDialogElement | null>(null);
 const title = ref('');
 const price = ref('');
+const titleTouched = ref(false);
+const priceTouched = ref(false);
 
 watch(
-    () => props.preview,
-    (preview) => {
-        if (preview === null) {
+    () => props.preview?.url ?? null,
+    (url) => {
+        if (url === null || props.preview === null) {
             dialog.value?.close();
 
             return;
         }
 
-        title.value = preview.title;
-        price.value = preview.price ?? '';
-        dialog.value?.showModal();
+        title.value = props.preview.title;
+        price.value = props.preview.price ?? '';
+        titleTouched.value = false;
+        priceTouched.value = false;
+
+        if (!dialog.value?.open) {
+            dialog.value?.showModal();
+        }
     },
     { flush: 'post' },
+);
+
+// Dane dociągnięte w tle nadpisują pola tylko, jeśli użytkownik ich nie ruszał.
+watch(
+    () => [props.preview?.title, props.preview?.price] as const,
+    ([nextTitle, nextPrice]) => {
+        if (!titleTouched.value && nextTitle) {
+            title.value = nextTitle;
+        }
+
+        if (!priceTouched.value && nextPrice) {
+            price.value = nextPrice;
+        }
+    },
 );
 
 function confirm(): void {
@@ -73,9 +95,9 @@ function onClose(): void {
                         referrerpolicy="no-referrer"
                         class="h-full w-full object-cover"
                     />
-                    <span v-else class="px-2 text-center text-sm"
-                        >bez zdjęcia</span
-                    >
+                    <span v-else class="px-2 text-center text-sm">{{
+                        enriching ? 'Szukam zdjęcia…' : 'bez zdjęcia'
+                    }}</span>
                 </div>
                 <div class="flex min-w-0 flex-[1_1_14rem] flex-col gap-4">
                     <div class="flex flex-col gap-1.5">
@@ -90,6 +112,7 @@ function onClose(): void {
                             rows="3"
                             maxlength="500"
                             required
+                            @input="titleTouched = true"
                             class="skin-outline field-sizing-content w-full resize-none rounded-control bg-surface px-3 py-2.5 text-base text-ink"
                         ></textarea>
                     </div>
@@ -104,12 +127,22 @@ function onClose(): void {
                             v-model="price"
                             type="text"
                             maxlength="64"
-                            placeholder="np. 349 zł"
+                            :placeholder="
+                                enriching ? 'Szukam ceny…' : 'np. 349 zł'
+                            "
+                            @input="priceTouched = true"
                             class="skin-outline h-11 w-full rounded-control bg-surface px-3 text-base text-ink placeholder:text-muted"
                         />
                     </div>
                     <p v-if="preview.shop" class="truncate text-sm text-muted">
                         {{ preview.shop }}
+                    </p>
+                    <p
+                        v-if="enriching"
+                        role="status"
+                        class="text-sm text-muted"
+                    >
+                        Uzupełniam brakujące dane, możesz już dodać…
                     </p>
                 </div>
             </div>

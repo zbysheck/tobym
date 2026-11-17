@@ -31,13 +31,21 @@ class ProductExtractor
      */
     public ?array $lastGenerated = null;
 
+    /**
+     * Czy AI mogłoby uzupełnić dane, ale zostało pominięte (tryb szybki).
+     */
+    public bool $generationSkipped = false;
+
     public function __construct(private RecipeGenerator $generator) {}
 
     /**
      * @return Fields
      */
-    public function extract(string $html, string $url): array
+    public function extract(string $html, string $url, bool $allowAi = true): array
     {
+        $this->lastGenerated = null;
+        $this->generationSkipped = false;
+
         $xpath = $this->xpath($html);
 
         if ($xpath === null) {
@@ -48,7 +56,7 @@ class ProductExtractor
         $domain = Urls::host($url);
 
         if ($domain !== null && ! $this->complete($fields)) {
-            $fields = $this->withRecipe($fields, $xpath, $html, $url, $domain);
+            $fields = $this->withRecipe($fields, $xpath, $html, $url, $domain, $allowAi);
         }
 
         // Tytuł karty przeglądarki to ostatnia deska ratunku: zwykle ma doklejoną nazwę sklepu.
@@ -104,7 +112,7 @@ class ProductExtractor
      * @param  Fields  $fields
      * @return Fields
      */
-    private function withRecipe(array $fields, DOMXPath $xpath, string $html, string $url, string $domain): array
+    private function withRecipe(array $fields, DOMXPath $xpath, string $html, string $url, string $domain, bool $allowAi): array
     {
         $record = ExtractionRecipe::query()->where('domain', $domain)->first();
         $saved = $this->normalizeRecipe($record?->recipe);
@@ -115,6 +123,13 @@ class ProductExtractor
         }
 
         if ($record?->generated_at !== null && $record->generated_at->gt(now()->subDay())) {
+            return $withSaved;
+        }
+
+        if (! $allowAi) {
+            $key = config('services.gemini.key');
+            $this->generationSkipped = is_string($key) && $key !== '';
+
             return $withSaved;
         }
 

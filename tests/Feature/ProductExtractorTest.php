@@ -87,6 +87,20 @@ class ProductExtractorTest extends TestCase
         $this->assertNotNull(ExtractionRecipe::query()->sole()->recipe);
     }
 
+    public function test_quick_mode_skips_ai_and_reports_that_more_is_possible(): void
+    {
+        Http::preventStrayRequests();
+        config(['services.gemini.key' => 'test-key']);
+
+        $extractor = app(ProductExtractor::class);
+        $fields = $extractor->extract(self::PAGE, 'https://sklep.example/ekspres', allowAi: false);
+
+        $this->assertSame('Ekspres przelewowy', $fields['title']);
+        $this->assertNull($fields['price']);
+        $this->assertTrue($extractor->generationSkipped);
+        $this->assertDatabaseCount('extraction_recipes', 0);
+    }
+
     public function test_without_a_key_nothing_is_sent_and_the_price_stays_empty(): void
     {
         Http::preventStrayRequests();

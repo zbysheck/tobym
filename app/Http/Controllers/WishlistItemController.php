@@ -13,11 +13,12 @@ class WishlistItemController extends Controller
 {
     /**
      * Pobiera dane produktu z linku, żeby pokazać je do potwierdzenia przed dodaniem.
+     * Bez "deep" odpowiada szybko (bez AI) i zwraca pending=true, gdy AI może jeszcze coś uzupełnić.
      */
     public function preview(Request $request, ProductMetadataFetcher $fetcher): JsonResponse
     {
         $url = $this->validatedUrl($request);
-        $metadata = $fetcher->fetch($url);
+        $metadata = $fetcher->fetch($url, allowAi: $request->boolean('deep'));
 
         return response()->json([
             'url' => $url,
@@ -25,6 +26,7 @@ class WishlistItemController extends Controller
             'shop' => $metadata->shop,
             'image_url' => $metadata->imageUrl,
             'price' => $metadata->price,
+            'pending' => $metadata->improvable,
         ]);
     }
 

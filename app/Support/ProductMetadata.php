@@ -9,5 +9,6 @@ final readonly class ProductMetadata
         public ?string $shop,
         public ?string $imageUrl,
         public ?string $price,
+        public bool $improvable = false,
     ) {}
 }
