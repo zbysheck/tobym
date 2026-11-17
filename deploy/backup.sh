@@ -8,7 +8,7 @@ env_value() {
     grep -E "^$1=" .env | tail -1 | cut -d= -f2- | sed -E 's/^"(.*)"$/\1/'
 }
 
-dir="$HOME/backups/tobym"
+dir="$HOME/tobym-backups"
 mkdir -p "$dir"
 chmod 700 "$dir"
 
