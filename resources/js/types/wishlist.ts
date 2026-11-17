@@ -49,4 +49,7 @@ export type GiftDetails = {
     note: string;
     priority: boolean;
     photo: File | null;
+    /** Slug wybranej listy; null razem z newList = nowa lista o tej nazwie. */
+    list: string | null;
+    newList: string | null;
 };

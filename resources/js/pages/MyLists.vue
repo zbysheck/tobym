@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
+import AddGiftDialog from '@/components/AddGiftDialog.vue';
 import AppHeader from '@/components/AppHeader.vue';
+import DropOverlay from '@/components/DropOverlay.vue';
 import SiteFooter from '@/components/SiteFooter.vue';
 import UiLayer from '@/components/UiLayer.vue';
 import { allThemeFontsUrl } from '@/lib/themes';
 import { confirmAction } from '@/lib/ui';
+import { useGiftAdder } from '@/lib/useGiftAdder';
+import { useLinkCapture } from '@/lib/useLinkCapture';
 import { countdown, formatDate } from '@/lib/wishlist';
 import type { ThemeOption } from '@/types';
 
@@ -32,6 +36,16 @@ const status = computed(() => page.props.flash.status);
 const errors = computed(() => page.props.errors);
 
 const current = computed(() => props.lists.filter((list) => !list.past));
+
+const adder = useGiftAdder();
+const { preview, enriching, saving: savingGift, errors: giftErrors } = adder;
+const { dragging } = useLinkCapture(
+    (url) => void adder.addLink(url),
+    () => true,
+);
+const targetLists = computed(() =>
+    props.lists.map((list) => ({ slug: list.slug, title: list.title })),
+);
 const past = computed(() => props.lists.filter((list) => list.past));
 
 const dialog = ref<HTMLDialogElement | null>(null);
@@ -146,6 +160,10 @@ async function deleteAccount(): Promise<void> {
                                 ? 'Nie masz jeszcze żadnej listy.'
                                 : `Wszystkie listy w jednym miejscu.`
                         }}
+                    </p>
+                    <p class="mt-1 hidden text-sm text-muted sm:block">
+                        Wklej link (Ctrl+V) albo przeciągnij go na stronę, a
+                        zapytamy, na którą listę go dodać.
                     </p>
                 </div>
                 <button
@@ -339,6 +357,17 @@ async function deleteAccount(): Promise<void> {
 
         <SiteFooter />
         <UiLayer />
+        <DropOverlay :visible="dragging" />
+        <AddGiftDialog
+            :preview="preview"
+            :enriching="enriching"
+            :saving="savingGift"
+            :errors="giftErrors"
+            :lists="targetLists"
+            :default-list="current[0]?.slug ?? lists[0]?.slug ?? null"
+            @confirm="adder.confirm"
+            @cancel="adder.cancel"
+        />
 
         <dialog
             ref="dialog"

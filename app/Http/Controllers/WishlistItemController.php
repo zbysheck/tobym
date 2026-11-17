@@ -47,12 +47,29 @@ class WishlistItemController extends Controller
     }
 
     /**
-     * Dodanie na stronie głównej (lista powstaje przy pierwszym prezencie) i z addona.
+     * Dodanie z okna potwierdzenia: na wskazaną listę ("list"), na nową listę ("new_list")
+     * albo, bez wskazania, na najnowszą listę (tworzoną, jeśli jej nie ma). Używa tego też addon.
      */
     public function storeCurrent(Request $request, CurrentWishlist $current, ProductMetadataFetcher $fetcher): RedirectResponse
     {
         $this->validateItem($request);
-        $wishlist = $current->findOrCreate($request);
+        $request->validate([
+            'list' => ['nullable', 'string', 'max:16'],
+            'new_list' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $slug = $this->optional($request, 'list');
+        $newList = $this->optional($request, 'new_list');
+
+        if ($newList !== null) {
+            $wishlist = $current->create($request, ['title' => $newList]);
+        } elseif ($slug !== null) {
+            $wishlist = $current->query($request)?->where('slug', $slug)->first();
+            abort_if($wishlist === null, 404);
+        } else {
+            $wishlist = $current->findOrCreate($request);
+        }
+
         $this->createItem($request, $wishlist, $fetcher);
 
         return redirect()->route('wishlist.show', $wishlist);

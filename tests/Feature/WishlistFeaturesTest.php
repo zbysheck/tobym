@@ -106,6 +106,26 @@ class WishlistFeaturesTest extends TestCase
         $this->assertTrue(Hash::check('2468', (string) $this->wishlist->pin_hash));
     }
 
+    public function test_a_gift_goes_to_the_chosen_or_a_brand_new_list(): void
+    {
+        $other = Wishlist::query()->create(['title' => 'Urodziny', 'theme' => Theme::Urodzinowa, 'draft_token' => hash('sha256', 'moj-token')]);
+
+        $this->post(route('items.store-current'), ['title' => 'Rolki', 'list' => $this->wishlist->slug])
+            ->assertRedirect(route('wishlist.show', $this->wishlist));
+        $this->post(route('items.store-current'), ['title' => 'Koc', 'new_list' => 'Imieniny'])->assertRedirect();
+
+        $this->assertSame(['Rolki'], $this->wishlist->items()->pluck('title')->all());
+        $this->assertSame(0, $other->items()->count());
+        $this->assertSame(['Koc'], Wishlist::query()->where('title', 'Imieniny')->sole()->items()->pluck('title')->all());
+    }
+
+    public function test_a_gift_cannot_be_added_to_someone_elses_list(): void
+    {
+        $foreign = Wishlist::query()->create(['title' => 'Cudza', 'theme' => Theme::Slubna, 'draft_token' => 'obcy']);
+
+        $this->post(route('items.store-current'), ['title' => 'Hack', 'list' => $foreign->slug])->assertNotFound();
+    }
+
     public function test_someone_else_cannot_change_the_list(): void
     {
         $this->withCookie(CurrentWishlist::COOKIE, 'ktos-inny');

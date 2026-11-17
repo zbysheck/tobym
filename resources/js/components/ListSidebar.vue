@@ -263,6 +263,10 @@ async function deleteList(): Promise<void> {
             >
                 {{ urlError || errors.url }}
             </p>
+            <p class="hidden text-xs text-muted lg:block">
+                Możesz też wkleić link (Ctrl+V) w dowolnym miejscu strony albo
+                przeciągnąć go tutaj.
+            </p>
             <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
                 <button
                     type="button"

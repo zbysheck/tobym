@@ -7,7 +7,13 @@ const props = defineProps<{
     saving: boolean;
     enriching: boolean;
     errors: Record<string, string>;
+    lists: { slug: string; title: string }[];
+    defaultList: string | null;
 }>();
+
+const NEW_LIST = '__new';
+const target = ref<string>('');
+const newListTitle = ref('');
 
 const emit = defineEmits<{
     confirm: [details: GiftDetails];
@@ -62,6 +68,8 @@ watch(
             titleTouched.value = false;
             priceTouched.value = false;
             resetPhoto();
+            target.value = props.defaultList ?? props.lists[0]?.slug ?? '';
+            newListTitle.value = '';
         }
 
         if (!dialog.value?.open) {
@@ -108,6 +116,14 @@ function confirm(): void {
         note: note.value.trim(),
         priority: priority.value,
         photo: photo.value,
+        list:
+            target.value === NEW_LIST || target.value === ''
+                ? null
+                : target.value,
+        newList:
+            target.value === NEW_LIST
+                ? newListTitle.value.trim() || 'Nowa lista'
+                : null,
     });
 }
 
@@ -162,6 +178,34 @@ function onClose(): void {
                     </label>
                 </div>
                 <div class="flex min-w-0 flex-[1_1_14rem] flex-col gap-4">
+                    <div v-if="lists.length > 0" class="flex flex-col gap-1.5">
+                        <label for="add-gift-list" class="text-sm font-semibold"
+                            >Na listę</label
+                        >
+                        <select
+                            id="add-gift-list"
+                            v-model="target"
+                            class="skin-outline h-11 w-full rounded-control bg-surface px-3 text-base text-ink"
+                        >
+                            <option
+                                v-for="list in lists"
+                                :key="list.slug"
+                                :value="list.slug"
+                            >
+                                {{ list.title }}
+                            </option>
+                            <option :value="NEW_LIST">+ Nowa lista…</option>
+                        </select>
+                        <input
+                            v-if="target === NEW_LIST"
+                            v-model="newListTitle"
+                            type="text"
+                            maxlength="120"
+                            aria-label="Nazwa nowej listy"
+                            placeholder="Nazwa nowej listy, np. Imieniny"
+                            class="skin-outline h-11 w-full rounded-control bg-surface px-3 text-base text-ink placeholder:text-muted"
+                        />
+                    </div>
                     <div class="flex flex-col gap-1.5">
                         <label
                             for="add-gift-title"

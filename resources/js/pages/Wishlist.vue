@@ -5,6 +5,7 @@ import { VueDraggable } from 'vue-draggable-plus';
 import AddGiftDialog from '@/components/AddGiftDialog.vue';
 import AppHeader from '@/components/AppHeader.vue';
 import GiftItem from '@/components/GiftItem.vue';
+import DropOverlay from '@/components/DropOverlay.vue';
 import ImageLightbox from '@/components/ImageLightbox.vue';
 import ListSidebar from '@/components/ListSidebar.vue';
 import QrDialog from '@/components/QrDialog.vue';
@@ -13,7 +14,6 @@ import SiteFooter from '@/components/SiteFooter.vue';
 import UiLayer from '@/components/UiLayer.vue';
 import {
     countdown,
-    fetchPreview,
     formatDate,
     itemsUrl,
     listUrl,
@@ -22,10 +22,10 @@ import {
 } from '@/lib/wishlist';
 import { themeFontsUrl } from '@/lib/themes';
 import { celebrate } from '@/lib/celebrate';
+import { useGiftAdder } from '@/lib/useGiftAdder';
+import { useLinkCapture } from '@/lib/useLinkCapture';
 import { toast } from '@/lib/ui';
 import type {
-    GiftDetails,
-    GiftPreview,
     ListSummary,
     ThemeOption,
     WishlistData,
@@ -86,12 +86,25 @@ const accentStyle = computed(() =>
 );
 
 const sidebar = ref<InstanceType<typeof ListSidebar> | null>(null);
-const urlError = ref('');
-const loadingPreview = ref(false);
-const enriching = ref(false);
-const preview = ref<GiftPreview | null>(null);
-const savingGift = ref(false);
-const giftErrors = ref<Record<string, string>>({});
+const adder = useGiftAdder(() => sidebar.value?.clearLink());
+const {
+    preview,
+    loading: loadingPreview,
+    enriching,
+    saving: savingGift,
+    urlError,
+    errors: giftErrors,
+    addLink,
+    addManual,
+} = adder;
+const { dragging } = useLinkCapture(
+    (url) => void addLink(url),
+    () => props.editable,
+);
+// Lista, na którą trafi prezent domyślnie: ta, którą właśnie oglądasz.
+const targetLists = computed(() =>
+    props.lists.map((list) => ({ slug: list.slug, title: list.title })),
+);
 const qrOpen = ref(false);
 
 const email = ref('');
@@ -249,102 +262,6 @@ const eventLabel = computed(() =>
         ? `${formatDate(props.wishlist.event_date)} · ${countdown(props.wishlist.event_date)}`
         : null,
 );
-
-async function addLink(link: string): Promise<void> {
-    if (loadingPreview.value) {
-        return;
-    }
-
-    loadingPreview.value = true;
-    urlError.value = '';
-    giftErrors.value = {};
-
-    const quick = await fetchPreview(link, false);
-    loadingPreview.value = false;
-
-    if (!quick.ok) {
-        urlError.value = quick.error;
-        toast(quick.error);
-
-        return;
-    }
-
-    preview.value = quick.preview;
-
-    if (!quick.preview.pending) {
-        return;
-    }
-
-    // Okno już jest otwarte; AI dociąga brakujące dane w tle.
-    enriching.value = true;
-    const deep = await fetchPreview(link, true);
-    enriching.value = false;
-
-    if (!deep.ok || preview.value?.url !== link) {
-        return;
-    }
-
-    const current = preview.value;
-    preview.value = {
-        ...current,
-        title: deep.preview.title,
-        image_url: current.image_url ?? deep.preview.image_url,
-        price: current.price ?? deep.preview.price,
-        shop: current.shop ?? deep.preview.shop,
-        pending: false,
-    };
-}
-
-function addManual(): void {
-    giftErrors.value = {};
-    preview.value = {
-        url: null,
-        title: '',
-        shop: null,
-        image_url: null,
-        price: null,
-        pending: false,
-    };
-}
-
-function confirmGift(details: GiftDetails): void {
-    const current = preview.value;
-
-    if (current === null) {
-        return;
-    }
-
-    savingGift.value = true;
-    router.post(
-        itemsUrl(props.slug),
-        {
-            url: current.url,
-            title: details.title,
-            price: details.price,
-            note: details.note,
-            priority: details.priority ? 1 : 0,
-            shop: current.shop,
-            image_url: current.image_url,
-            photo: details.photo,
-        },
-        {
-            preserveScroll: true,
-            forceFormData: details.photo !== null,
-            onSuccess: () => {
-                sidebar.value?.clearLink();
-                preview.value = null;
-                toast('Dodano do listy');
-                celebrate({ x: 0.5, y: 0.35 });
-            },
-            onError: (bag) => {
-                giftErrors.value = bag;
-            },
-            onFinish: () => {
-                savingGift.value = false;
-            },
-        },
-    );
-}
 
 function saveTitle(event: Event): void {
     const title = (event.target as HTMLInputElement).value.trim();
@@ -734,9 +651,13 @@ const listClass = computed(() =>
             :enriching="enriching"
             :saving="savingGift"
             :errors="giftErrors"
-            @confirm="confirmGift"
-            @cancel="preview = null"
+            :lists="targetLists"
+            :default-list="slug"
+            @confirm="adder.confirm"
+            @cancel="adder.cancel"
         />
+
+        <DropOverlay :visible="dragging" />
 
         <ImageLightbox
             :src="zoomed ? (zoomed.image_large ?? zoomed.image_url) : null"
