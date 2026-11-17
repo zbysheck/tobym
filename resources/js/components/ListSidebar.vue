@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { RequestPayload } from '@inertiajs/core';
 import { router, usePage } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { confirmAction, toast } from '@/lib/ui';
 import { listUrl } from '@/lib/wishlist';
 import type {
     ListSummary,
@@ -32,6 +33,17 @@ const emit = defineEmits<{
 
 const page = usePage();
 const errors = computed(() => page.props.errors);
+const user = computed(() => page.props.auth.user);
+
+// Ustawienia są rozwinięte na dużym ekranie, a na telefonie schowane, żeby lista była od razu widoczna.
+const settingsOpen = ref(false);
+onMounted(() => {
+    settingsOpen.value = window.matchMedia('(min-width: 1024px)').matches;
+});
+
+function onSettingsToggle(event: Event): void {
+    settingsOpen.value = (event.target as HTMLDetailsElement).open;
+}
 
 const url = ref('');
 const bulkOpen = ref(false);
@@ -49,7 +61,10 @@ const currentLists = computed(() => props.lists.filter((list) => !list.past));
 const pastLists = computed(() => props.lists.filter((list) => list.past));
 
 function save(data: RequestPayload): void {
-    router.patch(listUrl(props.slug), data, { preserveScroll: true });
+    router.patch(listUrl(props.slug), data, {
+        preserveScroll: true,
+        onSuccess: () => toast('Zapisano'),
+    });
 }
 
 function submitLink(): void {
@@ -155,6 +170,7 @@ async function copyLink(): Promise<void> {
 
     try {
         await navigator.clipboard.writeText(props.shareUrl);
+        toast('Skopiowano link do listy');
         copied.value = true;
         window.setTimeout(() => {
             copied.value = false;
@@ -164,14 +180,31 @@ async function copyLink(): Promise<void> {
     }
 }
 
-function deleteList(): void {
-    if (
-        props.slug !== null &&
-        window.confirm(
-            `Usunąć całą listę „${props.wishlist.title}” razem z prezentami? Tego nie da się cofnąć.`,
-        )
-    ) {
+async function deleteList(): Promise<void> {
+    if (props.slug === null) {
+        return;
+    }
+
+    const confirmed = await confirmAction({
+        title: 'Usunąć całą listę?',
+        text: `Lista „${props.wishlist.title}” zniknie razem ze wszystkimi prezentami. Tego nie da się cofnąć.`,
+        confirmLabel: 'Usuń listę',
+    });
+
+    if (confirmed) {
         router.delete(`/l/${props.slug}`);
+    }
+}
+
+async function deleteAccount(): Promise<void> {
+    const confirmed = await confirmAction({
+        title: 'Usunąć konto?',
+        text: 'Usuniemy Twoje konto, wszystkie listy, prezenty i wgrane zdjęcia. Tego nie da się cofnąć.',
+        confirmLabel: 'Usuń konto',
+    });
+
+    if (confirmed) {
+        router.delete('/account');
     }
 }
 </script>
@@ -293,84 +326,6 @@ function deleteList(): void {
             </template>
         </form>
 
-        <div
-            role="group"
-            aria-labelledby="layout-heading"
-            class="flex flex-col gap-2.5"
-        >
-            <h2 id="layout-heading" class="text-sm font-semibold">Widok</h2>
-            <div class="flex flex-wrap gap-2">
-                <button
-                    v-for="option in layoutOptions"
-                    :key="option.value"
-                    type="button"
-                    :aria-pressed="option.value === layout"
-                    class="skin-outline h-11 flex-1 rounded-control px-4 text-sm font-semibold"
-                    :class="
-                        option.value === layout
-                            ? 'bg-ink text-ground'
-                            : 'bg-surface text-ink'
-                    "
-                    @click="setLayout(option.value)"
-                >
-                    {{ option.label }}
-                </button>
-            </div>
-        </div>
-
-        <div class="flex flex-col gap-2.5">
-            <label for="list-theme" class="text-sm font-semibold">Skórka</label>
-            <select
-                id="list-theme"
-                :value="theme"
-                class="skin-outline h-11 w-full rounded-control bg-surface px-3 text-[15px] text-ink"
-                @change="onThemeChange"
-            >
-                <option
-                    v-for="option in themes"
-                    :key="option.value"
-                    :value="option.value"
-                >
-                    {{ option.label }}
-                </option>
-            </select>
-            <div class="flex items-center gap-3">
-                <label for="list-accent" class="text-sm">Kolor akcentu</label>
-                <input
-                    id="list-accent"
-                    type="color"
-                    :value="accent ?? '#b5302a'"
-                    class="h-11 w-14 cursor-pointer rounded-control bg-transparent"
-                    @input="onAccentInput"
-                    @change="saveAccent"
-                />
-                <button
-                    v-if="accent"
-                    type="button"
-                    class="h-11 text-sm text-muted underline underline-offset-4"
-                    @click="resetAccent"
-                >
-                    Domyślny
-                </button>
-            </div>
-        </div>
-
-        <div v-if="slug" class="flex flex-col gap-2.5">
-            <label for="list-date" class="text-sm font-semibold"
-                >Data wydarzenia</label
-            >
-            <input
-                id="list-date"
-                type="date"
-                :value="wishlist.event_date ?? ''"
-                class="skin-outline h-11 w-full rounded-control bg-surface px-3 text-[15px] text-ink"
-                @change="onDateChange"
-            />
-            <p class="text-xs text-muted">
-                Po tej dacie lista trafi do „Minione”.
-            </p>
-        </div>
-
         <div v-if="shareUrl" class="flex flex-col gap-2.5">
             <h2 class="text-sm font-semibold">Udostępnij</h2>
             <div class="flex flex-wrap gap-2">
@@ -390,60 +345,172 @@ function deleteList(): void {
                 </button>
             </div>
             <p class="text-xs break-all text-muted">{{ shareUrl }}</p>
-
-            <form class="flex flex-col gap-2" @submit.prevent="savePin">
-                <label for="list-pin" class="text-sm">
-                    {{
-                        wishlist.has_pin
-                            ? 'Lista chroniona PIN-em'
-                            : 'Ochrona PIN-em (opcjonalnie)'
-                    }}
-                </label>
-                <div class="flex gap-2">
-                    <input
-                        id="list-pin"
-                        v-model="pin"
-                        type="text"
-                        inputmode="numeric"
-                        maxlength="8"
-                        autocomplete="off"
-                        :placeholder="
-                            wishlist.has_pin ? 'nowy PIN' : '4–8 cyfr'
-                        "
-                        class="skin-outline h-11 min-w-0 flex-1 rounded-control bg-surface px-3 text-[15px] text-ink placeholder:text-muted"
-                    />
-                    <button
-                        type="submit"
-                        class="skin-outline h-11 rounded-control bg-surface px-4 text-sm font-semibold text-ink"
-                    >
-                        Ustaw
-                    </button>
-                </div>
-                <button
-                    v-if="wishlist.has_pin"
-                    type="button"
-                    class="h-9 self-start text-sm text-muted underline underline-offset-4"
-                    @click="removePin"
-                >
-                    Wyłącz PIN
-                </button>
-                <p
-                    v-if="errors.pin"
-                    role="alert"
-                    class="text-sm font-semibold text-accent"
-                >
-                    {{ errors.pin }}
-                </p>
-            </form>
         </div>
 
-        <button
-            v-if="slug"
-            type="button"
-            class="h-9 self-start text-sm text-muted underline underline-offset-4"
-            @click="deleteList"
+        <details
+            class="skin-outline group rounded-card bg-surface p-4"
+            :open="settingsOpen"
+            @toggle="onSettingsToggle"
         >
-            Usuń tę listę
-        </button>
+            <summary
+                class="flex cursor-pointer list-none items-center justify-between text-[15px] font-semibold"
+            >
+                Ustawienia listy
+                <span
+                    aria-hidden="true"
+                    class="text-xl leading-none transition-transform group-open:rotate-45"
+                    >+</span
+                >
+            </summary>
+            <div class="mt-5 flex flex-col gap-6">
+                <div
+                    role="group"
+                    aria-labelledby="layout-heading"
+                    class="flex flex-col gap-2.5"
+                >
+                    <h2 id="layout-heading" class="text-sm font-semibold">
+                        Widok
+                    </h2>
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            v-for="option in layoutOptions"
+                            :key="option.value"
+                            type="button"
+                            :aria-pressed="option.value === layout"
+                            class="skin-outline h-11 flex-1 rounded-control px-4 text-sm font-semibold"
+                            :class="
+                                option.value === layout
+                                    ? 'bg-ink text-ground'
+                                    : 'bg-surface text-ink'
+                            "
+                            @click="setLayout(option.value)"
+                        >
+                            {{ option.label }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-2.5">
+                    <label for="list-theme" class="text-sm font-semibold"
+                        >Skórka</label
+                    >
+                    <select
+                        id="list-theme"
+                        :value="theme"
+                        class="skin-outline h-11 w-full rounded-control bg-surface px-3 text-[15px] text-ink"
+                        @change="onThemeChange"
+                    >
+                        <option
+                            v-for="option in themes"
+                            :key="option.value"
+                            :value="option.value"
+                        >
+                            {{ option.label }}
+                        </option>
+                    </select>
+                    <div class="flex items-center gap-3">
+                        <label for="list-accent" class="text-sm"
+                            >Kolor akcentu</label
+                        >
+                        <input
+                            id="list-accent"
+                            type="color"
+                            :value="accent ?? '#b5302a'"
+                            class="h-11 w-14 cursor-pointer rounded-control bg-transparent"
+                            @input="onAccentInput"
+                            @change="saveAccent"
+                        />
+                        <button
+                            v-if="accent"
+                            type="button"
+                            class="h-11 text-sm text-muted underline underline-offset-4"
+                            @click="resetAccent"
+                        >
+                            Domyślny
+                        </button>
+                    </div>
+                </div>
+
+                <div v-if="slug" class="flex flex-col gap-2.5">
+                    <label for="list-date" class="text-sm font-semibold"
+                        >Data wydarzenia</label
+                    >
+                    <input
+                        id="list-date"
+                        type="date"
+                        :value="wishlist.event_date ?? ''"
+                        class="skin-outline h-11 w-full rounded-control bg-surface px-3 text-[15px] text-ink"
+                        @change="onDateChange"
+                    />
+                    <p class="text-xs text-muted">
+                        Po tej dacie lista trafi do „Minione”.
+                    </p>
+                </div>
+
+                <div v-if="slug" class="flex flex-col gap-2">
+                    <form class="flex flex-col gap-2" @submit.prevent="savePin">
+                        <label for="list-pin" class="text-sm">
+                            {{
+                                wishlist.has_pin
+                                    ? 'Lista chroniona PIN-em'
+                                    : 'Ochrona PIN-em (opcjonalnie)'
+                            }}
+                        </label>
+                        <div class="flex gap-2">
+                            <input
+                                id="list-pin"
+                                v-model="pin"
+                                type="text"
+                                inputmode="numeric"
+                                maxlength="8"
+                                autocomplete="off"
+                                :placeholder="
+                                    wishlist.has_pin ? 'nowy PIN' : '4–8 cyfr'
+                                "
+                                class="skin-outline h-11 min-w-0 flex-1 rounded-control bg-surface px-3 text-[15px] text-ink placeholder:text-muted"
+                            />
+                            <button
+                                type="submit"
+                                class="skin-outline h-11 rounded-control bg-surface px-4 text-sm font-semibold text-ink"
+                            >
+                                Ustaw
+                            </button>
+                        </div>
+                        <button
+                            v-if="wishlist.has_pin"
+                            type="button"
+                            class="h-9 self-start text-sm text-muted underline underline-offset-4"
+                            @click="removePin"
+                        >
+                            Wyłącz PIN
+                        </button>
+                        <p
+                            v-if="errors.pin"
+                            role="alert"
+                            class="text-sm font-semibold text-accent"
+                        >
+                            {{ errors.pin }}
+                        </p>
+                    </form>
+                </div>
+
+                <button
+                    v-if="slug"
+                    type="button"
+                    class="h-9 self-start text-sm text-muted underline underline-offset-4"
+                    @click="deleteList"
+                >
+                    Usuń tę listę
+                </button>
+                <button
+                    v-if="user"
+                    type="button"
+                    class="h-9 self-start text-sm text-muted underline underline-offset-4"
+                    @click="deleteAccount"
+                >
+                    Usuń konto i wszystkie listy
+                </button>
+            </div>
+        </details>
     </aside>
 </template>

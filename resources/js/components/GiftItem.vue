@@ -2,6 +2,7 @@
 import type { RequestPayload } from '@inertiajs/core';
 import { router } from '@inertiajs/vue3';
 import { computed, nextTick, ref } from 'vue';
+import { confirmAction, toast } from '@/lib/ui';
 import type { WishlistItem, WishlistLayout } from '@/types';
 
 const props = defineProps<{
@@ -29,7 +30,10 @@ const takenByOther = computed(
 );
 
 function patch(data: RequestPayload): void {
-    router.patch(`/items/${props.item.id}`, data, { preserveScroll: true });
+    router.patch(`/items/${props.item.id}`, data, {
+        preserveScroll: true,
+        onSuccess: () => toast('Zapisano'),
+    });
 }
 
 function fieldValue(event: Event): string {
@@ -87,14 +91,26 @@ function changePhoto(event: Event): void {
         router.post(
             `/items/${props.item.id}/photo`,
             { photo: file },
-            { preserveScroll: true, forceFormData: true },
+            {
+                preserveScroll: true,
+                forceFormData: true,
+                onSuccess: () => toast('Zdjęcie zmienione'),
+            },
         );
     }
 }
 
-function remove(): void {
-    if (window.confirm(`Usunąć „${props.item.title}” z listy?`)) {
-        router.delete(`/items/${props.item.id}`, { preserveScroll: true });
+async function remove(): Promise<void> {
+    const confirmed = await confirmAction({
+        title: 'Usunąć prezent?',
+        text: `„${props.item.title}” zniknie z listy.`,
+    });
+
+    if (confirmed) {
+        router.delete(`/items/${props.item.id}`, {
+            preserveScroll: true,
+            onSuccess: () => toast('Usunięto z listy'),
+        });
     }
 }
 
@@ -133,9 +149,22 @@ function blurOnEnter(event: KeyboardEvent): void {
                         : 'bg-white object-contain p-2'
                 "
             />
-            <span v-else class="px-2 text-center text-sm text-ink"
-                >bez zdjęcia</span
+            <svg
+                v-else
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                class="h-12 w-12 text-ink opacity-40"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.4"
+                stroke-linejoin="round"
             >
+                <rect x="3.5" y="9" width="17" height="11.5" rx="2" />
+                <rect x="2.5" y="6" width="19" height="4" rx="1.5" />
+                <path
+                    d="M12 6v14.5M12 6C10 2.5 6.5 2.5 7 5s5 1 5 1Zm0 0c2-3.5 5.5-3.5 5-1s-5 1-5 1Z"
+                />
+            </svg>
             <label
                 v-if="editable"
                 class="skin-outline absolute right-2 bottom-2 cursor-pointer rounded-control bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink opacity-90 focus-within:outline-2"

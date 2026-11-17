@@ -9,6 +9,7 @@ import ListSidebar from '@/components/ListSidebar.vue';
 import QrDialog from '@/components/QrDialog.vue';
 import ReserveDialog from '@/components/ReserveDialog.vue';
 import SiteFooter from '@/components/SiteFooter.vue';
+import UiLayer from '@/components/UiLayer.vue';
 import {
     countdown,
     fetchPreview,
@@ -19,6 +20,7 @@ import {
     textOn,
 } from '@/lib/wishlist';
 import { themeFontsUrl } from '@/lib/themes';
+import { toast } from '@/lib/ui';
 import type {
     GiftDetails,
     GiftPreview,
@@ -97,6 +99,7 @@ const search = ref('');
 const onlyFree = ref(false);
 const sort = ref<SortKey>('added');
 const shop = ref('');
+const filtersOpen = ref(false);
 
 const shops = computed(() =>
     [
@@ -283,6 +286,7 @@ function confirmGift(details: GiftDetails): void {
             onSuccess: () => {
                 sidebar.value?.clearLink();
                 preview.value = null;
+                toast('Dodano do listy');
             },
             onError: (bag) => {
                 giftErrors.value = bag;
@@ -298,7 +302,11 @@ function saveTitle(event: Event): void {
     const title = (event.target as HTMLInputElement).value.trim();
 
     if (title !== '' && title !== props.wishlist.title) {
-        router.patch(listUrl(props.slug), { title }, { preserveScroll: true });
+        router.patch(
+            listUrl(props.slug),
+            { title },
+            { preserveScroll: true, onSuccess: () => toast('Zapisano') },
+        );
     }
 }
 
@@ -356,6 +364,7 @@ function confirmReservation(name: string): void {
         { name },
         {
             preserveScroll: true,
+            onSuccess: () => toast('Zarezerwowano'),
             onFinish: () => {
                 reserving.value = null;
             },
@@ -364,7 +373,10 @@ function confirmReservation(name: string): void {
 }
 
 function cancelReservation(item: WishlistItem): void {
-    router.delete(reservationUrl(item), { preserveScroll: true });
+    router.delete(reservationUrl(item), {
+        preserveScroll: true,
+        onSuccess: () => toast('Rezerwacja cofnięta'),
+    });
 }
 
 function logout(): void {
@@ -517,6 +529,14 @@ const listClass = computed(() =>
                 />
 
                 <main class="flex min-w-0 flex-col gap-6 lg:order-1">
+                    <p
+                        v-if="!editable && wishlist.items.length > 0"
+                        class="skin-outline rounded-control bg-surface px-4 py-3 text-[15px]"
+                    >
+                        Kliknij <strong>„Rezerwuję”</strong> przy prezencie,
+                        który kupujesz. Inni goście zobaczą, że jest zajęty, a
+                        właściciel listy się nie dowie.
+                    </p>
                     <div
                         v-if="wishlist.items.length > 0"
                         class="flex flex-wrap items-end gap-3"
@@ -537,8 +557,17 @@ const listClass = computed(() =>
                                 class="skin-outline h-11 w-full rounded-control bg-surface px-3.5 text-[15px] text-ink placeholder:text-muted"
                             />
                         </div>
+                        <button
+                            type="button"
+                            :aria-expanded="filtersOpen"
+                            class="skin-outline h-11 rounded-control bg-surface px-4 text-[15px] font-semibold text-ink sm:hidden"
+                            @click="filtersOpen = !filtersOpen"
+                        >
+                            Filtry
+                        </button>
                         <div
                             v-if="shops.length > 1"
+                            :class="filtersOpen ? '' : 'max-sm:hidden'"
                             class="flex min-w-0 flex-[1_1_10rem] flex-col gap-1.5"
                         >
                             <label for="list-shop" class="text-sm font-semibold"
@@ -561,6 +590,7 @@ const listClass = computed(() =>
                         </div>
                         <div
                             class="flex min-w-0 flex-[1_1_12rem] flex-col gap-1.5"
+                            :class="filtersOpen ? '' : 'max-sm:hidden'"
                         >
                             <label for="list-sort" class="text-sm font-semibold"
                                 >Sortowanie</label
@@ -582,6 +612,7 @@ const listClass = computed(() =>
                         <label
                             v-if="!editable"
                             class="flex h-11 items-center gap-2 text-[15px]"
+                            :class="filtersOpen ? '' : 'max-sm:hidden'"
                         >
                             <input
                                 v-model="onlyFree"
@@ -650,6 +681,7 @@ const listClass = computed(() =>
         </div>
 
         <SiteFooter />
+        <UiLayer />
 
         <ReserveDialog
             :gift-title="reserving?.title ?? null"
