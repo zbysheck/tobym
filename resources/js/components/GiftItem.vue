@@ -144,7 +144,7 @@ function blurOnEnter(event: KeyboardEvent): void {
                 referrerpolicy="no-referrer"
                 class="h-full w-full"
                 :class="
-                    item.image_url.startsWith('/storage/')
+                    item.image_url.startsWith('/storage/gifts/')
                         ? 'object-cover'
                         : 'bg-white object-contain p-2'
                 "

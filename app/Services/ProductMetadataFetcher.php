@@ -63,6 +63,28 @@ class ProductMetadataFetcher
      */
     public function trace(string $url): array
     {
+        $result = $this->request($url, 'text/html,application/xhtml+xml', self::MAX_BYTES);
+
+        return ['html' => $result['body'], 'steps' => $result['steps']];
+    }
+
+    /**
+     * Pobiera plik (np. zdjęcie produktu) z tymi samymi zabezpieczeniami co strony.
+     */
+    public function binary(string $url, int $maxBytes): ?string
+    {
+        try {
+            return $this->request($url, 'image/avif,image/webp,image/*,*/*;q=0.8', $maxBytes)['body'];
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @return array{body: string|null, steps: list<string>}
+     */
+    private function request(string $url, string $accept, int $maxBytes): array
+    {
         $steps = [];
 
         for ($hop = 0; $hop <= self::MAX_REDIRECTS; $hop++) {
@@ -71,7 +93,7 @@ class ProductMetadataFetcher
             if ($target === null) {
                 $steps[] = 'Odrzucony adres (zły schemat lub port, host nie istnieje albo wskazuje na sieć prywatną): '.$url;
 
-                return ['html' => null, 'steps' => $steps];
+                return ['body' => null, 'steps' => $steps];
             }
 
             $response = Http::withOptions([
@@ -82,7 +104,7 @@ class ProductMetadataFetcher
             ])
                 ->withHeaders([
                     'User-Agent' => 'Mozilla/5.0 (compatible; Tobym/0.1)',
-                    'Accept' => 'text/html,application/xhtml+xml',
+                    'Accept' => $accept,
                     'Accept-Language' => 'pl,en;q=0.8',
                 ])
                 ->connectTimeout(4)
@@ -97,7 +119,7 @@ class ProductMetadataFetcher
                 if ($location === '') {
                     $steps[] = 'Przekierowanie bez adresu docelowego.';
 
-                    return ['html' => null, 'steps' => $steps];
+                    return ['body' => null, 'steps' => $steps];
                 }
 
                 $url = Urls::absolute($location, $url);
@@ -108,15 +130,21 @@ class ProductMetadataFetcher
             if (! $response->successful()) {
                 $steps[] = 'Sklep odmówił (kod inny niż 2xx).';
 
-                return ['html' => null, 'steps' => $steps];
+                return ['body' => null, 'steps' => $steps];
             }
 
-            return ['html' => substr($response->body(), 0, self::MAX_BYTES), 'steps' => $steps];
+            if (strlen($response->body()) > $maxBytes && ! str_contains($accept, 'html')) {
+                $steps[] = 'Plik jest za duży.';
+
+                return ['body' => null, 'steps' => $steps];
+            }
+
+            return ['body' => substr($response->body(), 0, $maxBytes), 'steps' => $steps];
         }
 
         $steps[] = 'Za dużo przekierowań.';
 
-        return ['html' => null, 'steps' => $steps];
+        return ['body' => null, 'steps' => $steps];
     }
 
     /**
