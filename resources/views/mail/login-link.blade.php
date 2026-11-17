@@ -10,7 +10,7 @@
                 <a href="{{ $url }}" style="display: inline-block; padding: 14px 24px; background: #17392c; color: #ffffff; font-size: 16px; font-weight: bold; text-decoration: none; border-radius: 8px;">Otwórz moją listę</a>
             </p>
             <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #5c5c5c;">
-                Link działa przez {{ $minutes }} minut. Jeśli to nie Ty prosiłeś o ten link, zignoruj tę wiadomość.
+                Link działa przez {{ $minutes }} minut i tylko raz. Jeśli to nie Ty prosiłeś o ten link, zignoruj tę wiadomość.
             </p>
         </div>
     </body>

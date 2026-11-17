@@ -18,5 +18,6 @@ Route::patch('/items/{item}', [WishlistItemController::class, 'update'])->name('
 Route::delete('/items/{item}', [WishlistItemController::class, 'destroy'])->name('items.destroy');
 
 Route::post('/login-link', [LoginLinkController::class, 'store'])->middleware('throttle:5,1')->name('login.link');
-Route::get('/login/{user}', [LoginLinkController::class, 'verify'])->middleware('signed')->name('login.verify');
+Route::get('/login/{user}', [LoginLinkController::class, 'confirm'])->middleware('signed')->name('login.verify');
+Route::post('/login/{user}', [LoginLinkController::class, 'verify'])->middleware('signed')->name('login.confirm');
 Route::post('/logout', [LoginLinkController::class, 'destroy'])->name('logout');

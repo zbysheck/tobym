@@ -9,10 +9,13 @@ use App\Support\CurrentWishlist;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class LoginLinkController extends Controller
 {
@@ -36,7 +39,8 @@ class LoginLinkController extends Controller
 
         // Numer szkicu jedzie w podpisanym linku, żeby lista trafiła na konto
         // także wtedy, gdy mail zostanie otwarty w innej przeglądarce.
-        $parameters = ['user' => $user->id];
+        // "n" czyni link jednorazowym: po użyciu trafia do cache i drugi raz nie zadziała.
+        $parameters = ['user' => $user->id, 'n' => Str::random(20)];
         $draft = $current->draft($request);
 
         if ($draft !== null) {
@@ -50,8 +54,23 @@ class LoginLinkController extends Controller
         return back()->with('status', 'Wysłaliśmy link na '.$email.'. Kliknij go, aby zapisać listę.');
     }
 
+    /**
+     * Link z maila otwiera najpierw stronę z przyciskiem. Skanery poczty, które same otwierają
+     * linki, nie zużyją więc jednorazowego logowania.
+     */
+    public function confirm(Request $request): Response
+    {
+        return Inertia::render('ConfirmLogin', ['action' => $request->fullUrl()]);
+    }
+
     public function verify(Request $request, CurrentWishlist $current, User $user): RedirectResponse
     {
+        $nonce = $request->string('n')->toString();
+
+        if ($nonce === '' || ! Cache::add('login-link:'.$nonce, true, now()->addMinutes(self::LINK_MINUTES + 1))) {
+            return redirect()->route('home')->with('status', 'Ten link został już użyty. Podaj maila jeszcze raz, wyślemy nowy.');
+        }
+
         $draftIds = array_filter([$request->integer('w'), $current->draft($request)?->id]);
 
         Auth::login($user, remember: true);

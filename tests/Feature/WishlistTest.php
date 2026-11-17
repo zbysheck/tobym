@@ -113,11 +113,27 @@ class WishlistTest extends TestCase
         $url = URL::temporarySignedRoute('login.verify', now()->addMinutes(5), [
             'user' => $user->id,
             'w' => $wishlist->id,
+            'n' => 'jednorazowy',
         ]);
 
-        $this->get($url)->assertRedirect(route('home'));
+        $this->get($url)->assertOk();
+        $this->assertGuest();
+
+        $this->post($url)->assertRedirect(route('home'));
 
         $this->assertAuthenticatedAs($user);
         $this->assertSame($user->id, $wishlist->refresh()->user_id);
+    }
+
+    public function test_a_login_link_works_only_once(): void
+    {
+        $user = User::factory()->create();
+        $url = URL::temporarySignedRoute('login.verify', now()->addMinutes(5), ['user' => $user->id, 'n' => 'raz']);
+
+        $this->post($url);
+        auth()->logout();
+
+        $this->post($url)->assertRedirect(route('home'))->assertSessionHas('status');
+        $this->assertGuest();
     }
 }
