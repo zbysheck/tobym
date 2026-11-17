@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+import { themeFontsUrl } from '@/lib/themes';
 import { textOn } from '@/lib/wishlist';
 
 const props = defineProps<{
@@ -39,16 +40,20 @@ function unlock(): void {
 </script>
 
 <template>
-    <Head :title="title" />
+    <Head :title="title">
+        <link rel="preconnect" href="https://fonts.bunny.net" />
+        <link rel="stylesheet" :href="themeFontsUrl(theme)" />
+    </Head>
 
     <div
         :data-theme="theme"
         :style="accentStyle"
-        class="flex min-h-screen items-center justify-center bg-ground p-5 font-body text-ink antialiased"
+        class="skin-backdrop flex min-h-screen items-center justify-center bg-ground p-5 font-body text-ink antialiased"
     >
         <main
             class="skin-outline flex w-full max-w-md flex-col gap-5 rounded-card bg-surface p-8 text-center shadow-card"
         >
+            <div class="skin-ornament self-center" aria-hidden="true"></div>
             <h1 class="skin-display text-[34px] leading-tight">{{ title }}</h1>
             <p class="text-[16px] text-muted">
                 Ta lista jest chroniona PIN-em. Poproś o niego osobę, która Ci

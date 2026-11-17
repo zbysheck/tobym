@@ -16,6 +16,7 @@ import {
     priceValue,
     textOn,
 } from '@/lib/wishlist';
+import { themeFontsUrl } from '@/lib/themes';
 import type {
     GiftDetails,
     GiftPreview,
@@ -382,16 +383,13 @@ const listClass = computed(() =>
 <template>
     <Head :title="wishlist.title">
         <link rel="preconnect" href="https://fonts.bunny.net" />
-        <link
-            rel="stylesheet"
-            href="https://fonts.bunny.net/css?family=dm-serif-display:400|dm-sans:400,600|cormorant-garamond:500,500i|jost:400,500|bricolage-grotesque:800|inter:400,600,700&display=swap"
-        />
+        <link rel="stylesheet" :href="themeFontsUrl(theme)" />
     </Head>
 
     <div
         :data-theme="theme"
         :style="accentStyle"
-        class="min-h-screen bg-ground font-body text-ink antialiased"
+        class="skin-backdrop min-h-screen bg-ground font-body text-ink antialiased"
     >
         <div
             v-if="!user && editable"
@@ -441,6 +439,8 @@ const listClass = computed(() =>
             </form>
         </div>
 
+        <div class="skin-band-stripe" aria-hidden="true"></div>
+
         <div class="mx-auto max-w-6xl px-5 pb-24 sm:px-8">
             <header
                 class="flex flex-wrap items-center justify-between gap-4 py-5"
@@ -465,6 +465,7 @@ const listClass = computed(() =>
             </p>
 
             <section class="skin-hero flex flex-col gap-3 pt-6 pb-9">
+                <div class="skin-ornament" aria-hidden="true"></div>
                 <template v-if="editable">
                     <label for="list-title" class="sr-only">Nazwa listy</label>
                     <input

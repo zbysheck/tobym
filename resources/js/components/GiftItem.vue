@@ -106,7 +106,7 @@ function blurOnEnter(event: KeyboardEvent): void {
 <template>
     <li
         :data-id="item.id"
-        class="skin-outline relative overflow-hidden rounded-card bg-surface shadow-card"
+        class="skin-outline skin-card relative overflow-hidden rounded-card bg-surface shadow-card"
         :class="[
             rows ? 'flex items-stretch' : 'flex flex-col',
             takenByOther ? 'opacity-60' : '',
