@@ -119,7 +119,7 @@ class WishlistTest extends TestCase
         $this->get($url)->assertOk();
         $this->assertGuest();
 
-        $this->post($url)->assertRedirect(route('home'));
+        $this->post($url)->assertRedirect(route('my-lists'));
 
         $this->assertAuthenticatedAs($user);
         $this->assertSame($user->id, $wishlist->refresh()->user_id);
@@ -133,7 +133,7 @@ class WishlistTest extends TestCase
         $this->post($url);
         auth()->logout();
 
-        $this->post($url)->assertRedirect(route('home'))->assertSessionHas('status');
+        $this->post($url)->assertRedirect(route('my-lists'))->assertSessionHas('status');
         $this->assertGuest();
     }
 }

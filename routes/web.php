@@ -11,7 +11,7 @@ use App\Http\Controllers\WishlistItemController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PageController::class, 'home'])->name('home');
-Route::get('/jak-to-dziala', [PageController::class, 'about'])->name('about');
+Route::get('/jak-to-dziala', [PageController::class, 'home'])->name('about');
 Route::get('/prywatnosc', [PageController::class, 'privacy'])->name('privacy');
 Route::get('/moje-listy', [MyListsController::class, 'index'])->name('my-lists');
 Route::get('/start', [WishlistController::class, 'start'])->name('start');

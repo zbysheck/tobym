@@ -135,7 +135,7 @@ const faq = [
                 <a
                     :href="listUrl ?? '/start'"
                     class="skin-outline inline-flex h-11 items-center rounded-control bg-surface px-4 text-[15px] font-semibold"
-                    >{{ listUrl ? 'Moja lista' : 'Zacznij listę' }}</a
+                    >{{ listUrl ? 'Moje listy' : 'Zacznij listę' }}</a
                 >
             </nav>
         </header>
@@ -167,7 +167,7 @@ const faq = [
                             class="skin-outline inline-flex h-13 items-center rounded-control bg-accent px-7 text-base font-semibold text-on-accent shadow-card"
                             >{{
                                 listUrl
-                                    ? 'Wróć do swojej listy'
+                                    ? 'Przejdź do swoich list'
                                     : 'Zacznij swoją listę'
                             }}</a
                         >
@@ -406,7 +406,9 @@ const faq = [
                     :href="listUrl ?? '/start'"
                     class="skin-outline inline-flex h-13 items-center rounded-control bg-accent px-8 text-base font-semibold text-on-accent shadow-card"
                     >{{
-                        listUrl ? 'Wróć do swojej listy' : 'Zacznij swoją listę'
+                        listUrl
+                            ? 'Przejdź do swoich list'
+                            : 'Zacznij swoją listę'
                     }}</a
                 >
             </section>

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Support\CurrentWishlist;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -11,24 +10,13 @@ use Inertia\Response;
 class PageController extends Controller
 {
     /**
-     * Strona główna: kto ma już listę, trafia prosto do niej, a nowi widzą stronę startową.
+     * Strona główna (logo prowadzi zawsze tutaj). Kto ma już listy, widzi przycisk powrotu do nich.
      */
-    public function home(Request $request, CurrentWishlist $current): Response|RedirectResponse
+    public function home(Request $request, CurrentWishlist $current): Response
     {
         $wishlist = $current->find($request);
 
-        if ($wishlist !== null) {
-            return redirect()->route('wishlist.show', $wishlist);
-        }
-
-        return $this->landing(null);
-    }
-
-    public function about(Request $request, CurrentWishlist $current): Response
-    {
-        $wishlist = $current->find($request);
-
-        return $this->landing($wishlist === null ? null : route('wishlist.show', $wishlist));
+        return $this->landing($wishlist === null ? null : route('my-lists'));
     }
 
     public function privacy(): Response

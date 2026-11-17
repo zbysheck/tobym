@@ -111,7 +111,7 @@ class WishlistController extends Controller
 
         $wishlist->delete();
 
-        return redirect()->route('home')->with('status', 'Lista „'.$wishlist->title.'” została usunięta.');
+        return redirect()->route('my-lists')->with('status', 'Lista „'.$wishlist->title.'” została usunięta.');
     }
 
     private function applyUpdate(Request $request, Wishlist $wishlist): void

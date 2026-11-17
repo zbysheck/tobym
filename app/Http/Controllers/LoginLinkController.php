@@ -69,7 +69,7 @@ class LoginLinkController extends Controller
         $nonce = $request->string('n')->toString();
 
         if ($nonce === '' || ! Cache::add('login-link:'.$nonce, true, now()->addMinutes(self::LINK_MINUTES + 1))) {
-            return redirect()->route('home')->with('status', 'Ten link został już użyty. Podaj maila jeszcze raz, wyślemy nowy.');
+            return redirect()->route('my-lists')->with('status', 'Ten link został już użyty. Podaj maila jeszcze raz, wyślemy nowy.');
         }
 
         $draftHashes = array_values(array_filter([$request->string('d')->toString(), $current->draftHash($request)]));
@@ -91,7 +91,7 @@ class LoginLinkController extends Controller
 
         Cookie::queue(Cookie::forget(CurrentWishlist::COOKIE));
 
-        return redirect()->route('home')->with('status', 'Lista jest zapisana na Twoim koncie.');
+        return redirect()->route('my-lists')->with('status', 'Lista jest zapisana na Twoim koncie.');
     }
 
     public function destroy(Request $request): RedirectResponse
