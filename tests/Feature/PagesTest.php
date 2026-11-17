@@ -43,6 +43,18 @@ class PagesTest extends TestCase
         $this->get(route('privacy'))->assertOk()->assertInertia(fn ($page) => $page->component('Privacy'));
     }
 
+    public function test_my_lists_shows_every_list_of_the_owner(): void
+    {
+        $user = User::factory()->create();
+        Wishlist::query()->create(['title' => 'Święta', 'theme' => Theme::Choinkowa, 'user_id' => $user->id]);
+        Wishlist::query()->create(['title' => 'Urodziny', 'theme' => Theme::Urodzinowa, 'user_id' => $user->id]);
+        Wishlist::query()->create(['title' => 'Cudza', 'theme' => Theme::Slubna, 'draft_token' => 'x']);
+
+        $this->actingAs($user)->get(route('my-lists'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('MyLists')->has('lists', 2));
+    }
+
     public function test_a_user_deletes_the_account_with_all_lists(): void
     {
         $user = User::factory()->create();

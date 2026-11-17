@@ -39,7 +39,7 @@ watch(
     <dialog
         ref="dialog"
         aria-labelledby="qr-heading"
-        class="skin-outline m-auto w-[min(26rem,calc(100vw-2rem))] rounded-card bg-surface p-0 font-body text-ink shadow-card backdrop:bg-black/50"
+        class="sheet skin-outline m-auto w-[min(26rem,calc(100vw-2rem))] rounded-card bg-surface p-0 font-body text-ink shadow-card backdrop:bg-black/50"
         @close="emit('close')"
     >
         <div

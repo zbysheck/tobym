@@ -33,7 +33,6 @@ const emit = defineEmits<{
 
 const page = usePage();
 const errors = computed(() => page.props.errors);
-const user = computed(() => page.props.auth.user);
 
 // Ustawienia są rozwinięte na dużym ekranie, a na telefonie schowane, żeby lista była od razu widoczna.
 const settingsOpen = ref(false);
@@ -193,18 +192,6 @@ async function deleteList(): Promise<void> {
 
     if (confirmed) {
         router.delete(`/l/${props.slug}`);
-    }
-}
-
-async function deleteAccount(): Promise<void> {
-    const confirmed = await confirmAction({
-        title: 'Usunąć konto?',
-        text: 'Usuniemy Twoje konto, wszystkie listy, prezenty i wgrane zdjęcia. Tego nie da się cofnąć.',
-        confirmLabel: 'Usuń konto',
-    });
-
-    if (confirmed) {
-        router.delete('/account');
     }
 }
 </script>
@@ -501,14 +488,6 @@ async function deleteAccount(): Promise<void> {
                     @click="deleteList"
                 >
                     Usuń tę listę
-                </button>
-                <button
-                    v-if="user"
-                    type="button"
-                    class="h-9 self-start text-sm text-muted underline underline-offset-4"
-                    @click="deleteAccount"
-                >
-                    Usuń konto i wszystkie listy
                 </button>
             </div>
         </details>

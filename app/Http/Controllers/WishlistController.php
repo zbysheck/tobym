@@ -40,11 +40,13 @@ class WishlistController extends Controller
         $data = $request->validate([
             'title' => ['nullable', 'string', 'max:120'],
             'theme' => ['nullable', Rule::enum(Theme::class)],
+            'event_date' => ['nullable', 'date'],
         ]);
 
         $wishlist = $current->create($request, array_filter([
             'title' => $data['title'] ?? 'Nowa lista',
             'theme' => $data['theme'] ?? null,
+            'event_date' => $data['event_date'] ?? null,
         ]));
 
         return redirect()->route('wishlist.show', $wishlist);
@@ -153,6 +155,7 @@ class WishlistController extends Controller
                 'title' => $item->title,
                 'shop' => $item->shop,
                 'image_url' => $item->image_url,
+                'image_large' => $item->image_path !== null ? $item->image_url : ($item->image_source ?? $item->image_url),
                 'price' => $item->price,
                 'note' => $item->note,
                 'priority' => $item->priority,

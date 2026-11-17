@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AddonController;
 use App\Http\Controllers\LoginLinkController;
+use App\Http\Controllers\MyListsController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\WishlistController;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [PageController::class, 'home'])->name('home');
 Route::get('/jak-to-dziala', [PageController::class, 'about'])->name('about');
 Route::get('/prywatnosc', [PageController::class, 'privacy'])->name('privacy');
+Route::get('/moje-listy', [MyListsController::class, 'index'])->name('my-lists');
 Route::get('/start', [WishlistController::class, 'start'])->name('start');
 Route::delete('/account', [AccountController::class, 'destroy'])->middleware('auth')->name('account.destroy');
 Route::patch('/list', [WishlistController::class, 'updateCurrent'])->name('wishlist.update-current');

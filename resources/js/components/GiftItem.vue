@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { RequestPayload } from '@inertiajs/core';
 import { router } from '@inertiajs/vue3';
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { confirmAction, toast } from '@/lib/ui';
 import type { WishlistItem, WishlistLayout } from '@/types';
 
@@ -10,12 +10,24 @@ const props = defineProps<{
     layout: WishlistLayout;
     editable: boolean;
     draggable: boolean;
+    highlight?: boolean;
 }>();
 
 const emit = defineEmits<{
     reserve: [item: WishlistItem];
     unreserve: [item: WishlistItem];
+    zoom: [item: WishlistItem];
 }>();
+
+// Gwiazdka zmienia się od razu, zanim serwer potwierdzi zapis.
+const priority = ref(props.item.priority);
+const starPop = ref(false);
+watch(
+    () => props.item.priority,
+    (value) => {
+        priority.value = value;
+    },
+);
 
 const rows = computed(() => props.layout === 'rows');
 const editingTitle = ref(false);
@@ -81,7 +93,27 @@ function savePrice(event: Event): void {
 }
 
 function togglePriority(): void {
-    patch({ priority: !props.item.priority });
+    priority.value = !priority.value;
+    starPop.value = true;
+    window.setTimeout(() => {
+        starPop.value = false;
+    }, 400);
+    router.patch(
+        `/items/${props.item.id}`,
+        { priority: priority.value },
+        {
+            preserveScroll: true,
+            onSuccess: () =>
+                toast(
+                    priority.value
+                        ? 'Oznaczono: bardzo chcę'
+                        : 'Zdjęto oznaczenie',
+                ),
+            onError: () => {
+                priority.value = !priority.value;
+            },
+        },
+    );
 }
 
 function changePhoto(event: Event): void {
@@ -122,12 +154,36 @@ function blurOnEnter(event: KeyboardEvent): void {
 <template>
     <li
         :data-id="item.id"
-        class="skin-outline skin-card relative overflow-hidden rounded-card bg-surface shadow-card"
+        class="skin-outline skin-card lift group relative overflow-hidden rounded-card bg-surface shadow-card"
         :class="[
             rows ? 'flex items-stretch' : 'flex flex-col',
             takenByOther ? 'opacity-60' : '',
+            highlight ? 'flash' : '',
         ]"
     >
+        <button
+            v-if="draggable"
+            type="button"
+            aria-label="Przeciągnij, aby zmienić kolejność"
+            title="Przeciągnij, aby zmienić kolejność"
+            class="drag-handle absolute inset-y-0 left-0 z-10 flex w-1.5 cursor-grab items-center justify-center overflow-hidden bg-ink/85 text-ground transition-[width] duration-200 group-hover:w-8 focus-visible:w-8 active:cursor-grabbing [@media(hover:none)]:w-7"
+        >
+            <svg
+                aria-hidden="true"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                class="flex-none opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+            >
+                <circle cx="9" cy="6" r="1.6" />
+                <circle cx="15" cy="6" r="1.6" />
+                <circle cx="9" cy="12" r="1.6" />
+                <circle cx="15" cy="12" r="1.6" />
+                <circle cx="9" cy="18" r="1.6" />
+                <circle cx="15" cy="18" r="1.6" />
+            </svg>
+        </button>
         <div
             class="skin-outline relative flex flex-none items-center justify-center bg-tile"
             :class="
@@ -136,19 +192,26 @@ function blurOnEnter(event: KeyboardEvent): void {
                     : 'aspect-[4/3] border-x-0 border-t-0'
             "
         >
-            <img
+            <button
                 v-if="item.image_url"
-                :src="item.image_url"
-                alt=""
-                loading="lazy"
-                referrerpolicy="no-referrer"
-                class="h-full w-full"
-                :class="
-                    item.image_url.startsWith('/storage/gifts/')
-                        ? 'object-cover'
-                        : 'bg-white object-contain p-2'
-                "
-            />
+                type="button"
+                :aria-label="`Powiększ zdjęcie: ${item.title}`"
+                class="h-full w-full cursor-zoom-in"
+                @click="emit('zoom', item)"
+            >
+                <img
+                    :src="item.image_url"
+                    alt=""
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                    class="h-full w-full transition-transform duration-300 group-hover:scale-[1.03]"
+                    :class="
+                        item.image_url.startsWith('/storage/gifts/')
+                            ? 'object-cover'
+                            : 'bg-white object-contain p-2'
+                    "
+                />
+            </button>
             <svg
                 v-else
                 aria-hidden="true"
@@ -167,9 +230,24 @@ function blurOnEnter(event: KeyboardEvent): void {
             </svg>
             <label
                 v-if="editable"
-                class="skin-outline absolute right-2 bottom-2 cursor-pointer rounded-control bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink opacity-90 focus-within:outline-2"
+                :aria-label="`Zmień zdjęcie: ${item.title}`"
+                title="Zmień zdjęcie"
+                class="skin-outline press absolute right-2 bottom-2 flex h-9 cursor-pointer items-center gap-1.5 rounded-control bg-surface px-2.5 text-xs font-semibold text-ink opacity-90 focus-within:outline-2"
             >
-                Zmień zdjęcie
+                <svg
+                    aria-hidden="true"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linejoin="round"
+                >
+                    <path d="M4 8h3l2-3h6l2 3h3v11H4Z" />
+                    <circle cx="12" cy="13" r="3.5" />
+                </svg>
+                <span class="hidden sm:inline">Zmień zdjęcie</span>
                 <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
@@ -180,7 +258,7 @@ function blurOnEnter(event: KeyboardEvent): void {
         </div>
 
         <div
-            class="flex min-w-0 flex-1 gap-3 p-4"
+            class="flex min-w-0 flex-1 gap-3 p-3 sm:p-4"
             :class="rows ? 'flex-wrap items-center' : 'flex-col'"
         >
             <div
@@ -199,7 +277,7 @@ function blurOnEnter(event: KeyboardEvent): void {
                                 :value="item.title"
                                 rows="2"
                                 maxlength="500"
-                                class="skin-display field-sizing-content w-full resize-none bg-transparent text-[21px] leading-tight text-ink"
+                                class="skin-display field-sizing-content w-full resize-none bg-transparent text-[17px] leading-tight text-ink sm:text-[21px]"
                                 @blur="saveTitle"
                                 @keydown.enter.prevent="blurOnEnter"
                                 @keydown.esc="editingTitle = false"
@@ -210,7 +288,7 @@ function blurOnEnter(event: KeyboardEvent): void {
                             type="button"
                             :title="item.title"
                             :aria-label="`Zmień nazwę: ${item.title}`"
-                            class="skin-display line-clamp-3 cursor-text text-left text-[21px] leading-tight text-ink"
+                            class="skin-display line-clamp-3 cursor-text text-left text-[17px] leading-tight text-ink sm:text-[21px]"
                             @click="startEditingTitle"
                         >
                             {{ item.title }}
@@ -218,7 +296,7 @@ function blurOnEnter(event: KeyboardEvent): void {
                         <p
                             v-else
                             :title="item.title"
-                            class="skin-display line-clamp-3 text-[21px] leading-tight text-ink"
+                            class="skin-display line-clamp-3 text-[17px] leading-tight text-ink sm:text-[21px]"
                         >
                             {{ item.title }}
                         </p>
@@ -226,19 +304,20 @@ function blurOnEnter(event: KeyboardEvent): void {
                     <button
                         v-if="editable"
                         type="button"
-                        :aria-pressed="item.priority"
+                        :aria-pressed="priority"
                         :aria-label="
-                            item.priority
+                            priority
                                 ? 'Bardzo chcę (kliknij, aby zdjąć)'
                                 : 'Oznacz: bardzo chcę'
                         "
                         :title="
-                            item.priority
-                                ? 'Bardzo chcę'
-                                : 'Oznacz: bardzo chcę'
+                            priority ? 'Bardzo chcę' : 'Oznacz: bardzo chcę'
                         "
                         class="-mt-1 -mr-2 flex h-11 w-11 flex-none items-center justify-center"
-                        :class="item.priority ? 'text-accent' : 'text-muted'"
+                        :class="[
+                            priority ? 'text-accent' : 'text-muted',
+                            starPop ? 'pop' : '',
+                        ]"
                         @click="togglePriority"
                     >
                         <svg
@@ -246,7 +325,7 @@ function blurOnEnter(event: KeyboardEvent): void {
                             width="22"
                             height="22"
                             viewBox="0 0 24 24"
-                            :fill="item.priority ? 'currentColor' : 'none'"
+                            :fill="priority ? 'currentColor' : 'none'"
                             stroke="currentColor"
                             stroke-width="1.8"
                             stroke-linejoin="round"
@@ -334,28 +413,6 @@ function blurOnEnter(event: KeyboardEvent): void {
                         @blur="savePrice"
                         @keydown.enter="blurOnEnter"
                     />
-                    <button
-                        v-if="draggable"
-                        type="button"
-                        aria-label="Przeciągnij, aby zmienić kolejność"
-                        title="Przeciągnij, aby zmienić kolejność"
-                        class="drag-handle skin-outline flex h-11 w-11 flex-none cursor-grab items-center justify-center rounded-control bg-surface text-ink active:cursor-grabbing"
-                    >
-                        <svg
-                            aria-hidden="true"
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                        >
-                            <circle cx="9" cy="6" r="1.6" />
-                            <circle cx="15" cy="6" r="1.6" />
-                            <circle cx="9" cy="12" r="1.6" />
-                            <circle cx="15" cy="12" r="1.6" />
-                            <circle cx="9" cy="18" r="1.6" />
-                            <circle cx="15" cy="18" r="1.6" />
-                        </svg>
-                    </button>
                     <button
                         type="button"
                         :aria-label="`Usuń: ${item.title}`"

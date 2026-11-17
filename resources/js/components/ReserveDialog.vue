@@ -49,7 +49,7 @@ function onClose(): void {
     <dialog
         ref="dialog"
         aria-labelledby="reserve-heading"
-        class="skin-outline m-auto w-[min(28rem,calc(100vw-2rem))] rounded-card bg-surface p-0 font-body text-ink shadow-card backdrop:bg-black/50"
+        class="sheet skin-outline m-auto w-[min(28rem,calc(100vw-2rem))] rounded-card bg-surface p-0 font-body text-ink shadow-card backdrop:bg-black/50"
         @close="onClose"
     >
         <form

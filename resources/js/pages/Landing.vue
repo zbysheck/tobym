@@ -2,7 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import AppLogo from '@/components/AppLogo.vue';
 import SiteFooter from '@/components/SiteFooter.vue';
-import { themeFontsUrl } from '@/lib/themes';
+import { allThemeFontsUrl } from '@/lib/themes';
 
 defineProps<{
     listUrl: string | null;
@@ -111,7 +111,7 @@ const faq = [
             content="Wklej link z dowolnego sklepu, wyślij listę bliskim, a oni zarezerwują prezenty. Bez rejestracji, za darmo, z niespodzianką."
         />
         <link rel="preconnect" href="https://fonts.bunny.net" />
-        <link rel="stylesheet" :href="themeFontsUrl('swiateczna')" />
+        <link rel="stylesheet" :href="allThemeFontsUrl()" />
     </Head>
 
     <div

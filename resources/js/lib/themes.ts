@@ -14,3 +14,12 @@ export function themeFontsUrl(theme: string): string {
 
     return `https://fonts.bunny.net/css?family=${families}&display=swap`;
 }
+
+/** Kroje wszystkich skórek naraz (strony z podglądem kilku skórek). */
+export function allThemeFontsUrl(): string {
+    const families = [
+        ...new Set(Object.values(FONTS).join('|').split('|')),
+    ].join('|');
+
+    return `https://fonts.bunny.net/css?family=${families}|dm-serif-display:400&display=swap`;
+}

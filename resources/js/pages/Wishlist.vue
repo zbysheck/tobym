@@ -3,8 +3,9 @@ import { Head, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import AddGiftDialog from '@/components/AddGiftDialog.vue';
-import AppLogo from '@/components/AppLogo.vue';
+import AppHeader from '@/components/AppHeader.vue';
 import GiftItem from '@/components/GiftItem.vue';
+import ImageLightbox from '@/components/ImageLightbox.vue';
 import ListSidebar from '@/components/ListSidebar.vue';
 import QrDialog from '@/components/QrDialog.vue';
 import ReserveDialog from '@/components/ReserveDialog.vue';
@@ -20,6 +21,7 @@ import {
     textOn,
 } from '@/lib/wishlist';
 import { themeFontsUrl } from '@/lib/themes';
+import { celebrate } from '@/lib/celebrate';
 import { toast } from '@/lib/ui';
 import type {
     GiftDetails,
@@ -163,12 +165,56 @@ const canReorder = computed(
         shop.value === '',
 );
 const orderedItems = ref<WishlistItem[]>([...props.wishlist.items]);
+const highlightId = ref<number | null>(null);
 watch(
     () => props.wishlist.items,
-    (items) => {
+    (items, previous) => {
         orderedItems.value = [...items];
+
+        // Nowo dodany prezent na chwilę się podświetla.
+        const known = new Set((previous ?? []).map((item) => item.id));
+        const added = items.find((item) => !known.has(item.id));
+
+        if (previous !== undefined && added !== undefined) {
+            highlightId.value = added.id;
+            window.setTimeout(() => {
+                highlightId.value = null;
+            }, 1800);
+        }
     },
 );
+
+const zoomed = ref<WishlistItem | null>(null);
+const quickAddOpen = ref(false);
+const quickAdd = ref<HTMLDialogElement | null>(null);
+const quickUrl = ref('');
+
+watch(
+    quickAddOpen,
+    (open) => {
+        if (open) {
+            quickUrl.value = '';
+            quickAdd.value?.showModal();
+        } else {
+            quickAdd.value?.close();
+        }
+    },
+    { flush: 'post' },
+);
+
+function submitQuickAdd(): void {
+    const link = quickUrl.value.trim();
+
+    if (link !== '') {
+        quickAddOpen.value = false;
+        void addLink(link);
+    }
+}
+
+function quickManual(): void {
+    quickAddOpen.value = false;
+    addManual();
+}
 
 function saveOrder(): void {
     router.patch(
@@ -218,6 +264,7 @@ async function addLink(link: string): Promise<void> {
 
     if (!quick.ok) {
         urlError.value = quick.error;
+        toast(quick.error);
 
         return;
     }
@@ -287,6 +334,7 @@ function confirmGift(details: GiftDetails): void {
                 sidebar.value?.clearLink();
                 preview.value = null;
                 toast('Dodano do listy');
+                celebrate({ x: 0.5, y: 0.35 });
             },
             onError: (bag) => {
                 giftErrors.value = bag;
@@ -364,7 +412,10 @@ function confirmReservation(name: string): void {
         { name },
         {
             preserveScroll: true,
-            onSuccess: () => toast('Zarezerwowano'),
+            onSuccess: () => {
+                toast('Zarezerwowano. Dziękujemy!');
+                celebrate();
+            },
             onFinish: () => {
                 reserving.value = null;
             },
@@ -379,10 +430,6 @@ function cancelReservation(item: WishlistItem): void {
     });
 }
 
-function logout(): void {
-    router.post('/logout');
-}
-
 function blurOnEnter(event: KeyboardEvent): void {
     (event.target as HTMLElement).blur();
 }
@@ -390,7 +437,7 @@ function blurOnEnter(event: KeyboardEvent): void {
 const listClass = computed(() =>
     layout.value === 'rows'
         ? 'flex flex-col gap-4'
-        : 'grid grid-cols-[repeat(auto-fill,minmax(15.5rem,1fr))] gap-6',
+        : 'grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(15.5rem,1fr))] sm:gap-6',
 );
 </script>
 
@@ -456,19 +503,7 @@ const listClass = computed(() =>
         <div class="skin-band-stripe" aria-hidden="true"></div>
 
         <div class="mx-auto max-w-6xl px-5 pb-24 sm:px-8">
-            <header
-                class="flex flex-wrap items-center justify-between gap-4 py-5"
-            >
-                <AppLogo />
-                <button
-                    v-if="user"
-                    type="button"
-                    class="h-11 px-1 text-sm text-muted underline underline-offset-4"
-                    @click="logout"
-                >
-                    Wyloguj ({{ user.email }})
-                </button>
-            </header>
+            <AppHeader />
 
             <p
                 v-if="status && (user || !editable)"
@@ -656,6 +691,8 @@ const listClass = computed(() =>
                             :layout="layout"
                             :editable="editable"
                             :draggable="true"
+                            :highlight="highlightId === item.id"
+                            @zoom="zoomed = $event"
                         />
                     </VueDraggable>
                     <TransitionGroup
@@ -672,6 +709,8 @@ const listClass = computed(() =>
                             :layout="layout"
                             :editable="editable"
                             :draggable="false"
+                            :highlight="highlightId === item.id"
+                            @zoom="zoomed = $event"
                             @reserve="reserving = $event"
                             @unreserve="cancelReservation"
                         />
@@ -698,6 +737,60 @@ const listClass = computed(() =>
             @confirm="confirmGift"
             @cancel="preview = null"
         />
+
+        <ImageLightbox
+            :src="zoomed ? (zoomed.image_large ?? zoomed.image_url) : null"
+            :alt="zoomed?.title ?? ''"
+            @close="zoomed = null"
+        />
+
+        <button
+            v-if="editable"
+            type="button"
+            class="press fixed right-4 bottom-5 z-30 flex h-14 items-center gap-2 rounded-full bg-accent px-5 text-base font-semibold text-on-accent shadow-[0_12px_28px_-10px_rgb(0_0_0/0.5)] lg:hidden"
+            @click="quickAddOpen = true"
+        >
+            <span aria-hidden="true" class="text-2xl leading-none">+</span>
+            Dodaj prezent
+        </button>
+
+        <dialog
+            ref="quickAdd"
+            aria-labelledby="quick-add-heading"
+            class="sheet skin-outline m-auto w-[min(30rem,calc(100vw-2rem))] rounded-card bg-surface p-0 font-body text-ink shadow-card backdrop:bg-black/50"
+            @close="quickAddOpen = false"
+        >
+            <form
+                class="flex flex-col gap-4 p-6"
+                @submit.prevent="submitQuickAdd"
+            >
+                <h2 id="quick-add-heading" class="skin-display text-[26px]">
+                    Dodaj prezent
+                </h2>
+                <label for="quick-url" class="sr-only">Link do prezentu</label>
+                <input
+                    id="quick-url"
+                    v-model="quickUrl"
+                    type="url"
+                    inputmode="url"
+                    placeholder="Wklej link do prezentu"
+                    class="skin-outline h-12 w-full rounded-control bg-surface px-3.5 text-base text-ink placeholder:text-muted"
+                />
+                <button
+                    type="submit"
+                    class="skin-outline press h-12 rounded-control bg-accent px-6 text-base font-semibold text-on-accent"
+                >
+                    Dodaj z linku
+                </button>
+                <button
+                    type="button"
+                    class="skin-outline press h-12 rounded-control bg-surface px-6 text-base font-semibold text-ink"
+                    @click="quickManual"
+                >
+                    Prezent bez linku
+                </button>
+            </form>
+        </dialog>
 
         <QrDialog
             :url="qrOpen ? shareUrl : null"

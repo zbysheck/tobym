@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\CurrentWishlist;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -41,6 +42,8 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            // Czy odwiedzający ma jakąkolwiek listę (link "Moje listy" w nagłówku).
+            'hasLists' => fn () => app(CurrentWishlist::class)->query($request)?->exists() ?? false,
             'flash' => [
                 'status' => $request->session()->get('status'),
             ],
