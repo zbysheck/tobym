@@ -57,6 +57,35 @@ class ProductExtractorTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_a_price_kept_only_in_script_data_is_read_with_a_pattern(): void
+    {
+        config(['services.gemini.key' => 'test-key']);
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => ['parts' => [[
+                        'text' => json_encode([
+                            'title' => null,
+                            'price' => null,
+                            'image' => null,
+                            'price_pattern' => '"appliedDiscount":\\{[^}]*"price":"([\\d.]+)"',
+                            'currency' => 'PLN',
+                        ]),
+                    ]]],
+                ]],
+            ]),
+        ]);
+
+        $html = '<html><head><meta property="og:title" content="Kandydat"></head><body><h1>Kandydat</h1>'
+            .'<div class="skeleton"></div><script>window.__STATE__ = {"Offer:1":{"originalPrice":"59.90",'
+            .'"appliedDiscount":{"__typename":"OfferDiscount","price":"48.99"}}};</script></body></html>';
+
+        $fields = app(ProductExtractor::class)->extract($html, 'https://www.empik.example/kandydat');
+
+        $this->assertSame('48,99 zł', $fields['price']);
+        $this->assertNotNull(ExtractionRecipe::query()->sole()->recipe);
+    }
+
     public function test_without_a_key_nothing_is_sent_and_the_price_stays_empty(): void
     {
         Http::preventStrayRequests();

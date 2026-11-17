@@ -16,11 +16,20 @@ use Throwable;
  * dla domeny, a gdy go nie ma, prosi AI o wygenerowanie nowego (najwyżej raz na dobę).
  *
  * @phpstan-type Fields array{title: string|null, shop: string|null, image: string|null, price: string|null}
- * @phpstan-type Recipe array{title: string|null, price: string|null, image: string|null}
+ * @phpstan-type Recipe array{title: string|null, price: string|null, image: string|null, price_pattern: string|null, currency: string|null}
  */
 class ProductExtractor
 {
-    private const PROMPT_BYTES = 60_000;
+    private const PROMPT_BYTES = 30_000;
+
+    private const SCRIPT_DATA_BYTES = 8_000;
+
+    /**
+     * Ostatnia odpowiedź AI (do diagnostyki w tobym:probe).
+     *
+     * @var Recipe|null
+     */
+    public ?array $lastGenerated = null;
 
     public function __construct(private RecipeGenerator $generator) {}
 
@@ -97,7 +106,7 @@ class ProductExtractor
     {
         $record = ExtractionRecipe::query()->where('domain', $domain)->first();
         $saved = $this->normalizeRecipe($record?->recipe);
-        $withSaved = $saved === null ? $fields : $this->applyRecipe($fields, $xpath, $saved);
+        $withSaved = $saved === null ? $fields : $this->applyRecipe($fields, $xpath, $html, $saved);
 
         if ($withSaved['title'] !== null && $withSaved['price'] !== null) {
             return $withSaved;
@@ -107,13 +116,14 @@ class ProductExtractor
             return $withSaved;
         }
 
-        $generated = $this->generator->generate($this->condense($html), $url);
+        $generated = $this->generator->generate($this->condense($html), $this->scriptData($html), $url);
+        $this->lastGenerated = $generated;
 
         if ($generated === null) {
             return $withSaved;
         }
 
-        $withGenerated = $this->applyRecipe($fields, $xpath, $generated);
+        $withGenerated = $this->applyRecipe($fields, $xpath, $html, $generated);
         $better = $this->filled($withGenerated) > $this->filled($withSaved);
 
         ExtractionRecipe::query()->updateOrCreate(
@@ -129,16 +139,42 @@ class ProductExtractor
      * @param  Recipe  $recipe
      * @return Fields
      */
-    private function applyRecipe(array $fields, DOMXPath $xpath, array $recipe): array
+    private function applyRecipe(array $fields, DOMXPath $xpath, string $html, array $recipe): array
     {
         $fields['title'] ??= $this->evaluate($xpath, $recipe['title']);
         $fields['image'] ??= $this->evaluate($xpath, $recipe['image']);
+        $fields['price'] ??= $this->priceFromText($this->evaluate($xpath, $recipe['price']));
 
         if ($fields['price'] === null) {
-            $fields['price'] = $this->priceFromText($this->evaluate($xpath, $recipe['price']));
+            $amount = $this->match($html, $recipe['price_pattern']);
+            $fields['price'] = $this->formatPrice($amount, $recipe['currency'])
+                ?? $this->priceFromText($amount);
         }
 
         return $fields;
+    }
+
+    /**
+     * Stosuje wyrażenie regularne z przepisu do surowego źródła strony (także skryptów).
+     */
+    private function match(string $html, ?string $pattern): ?string
+    {
+        if ($pattern === null) {
+            return null;
+        }
+
+        $delimited = '~'.str_replace('~', '\\~', $pattern).'~u';
+        $previous = ini_set('pcre.backtrack_limit', '100000');
+
+        try {
+            $found = @preg_match($delimited, $html, $match);
+        } finally {
+            if ($previous !== false) {
+                ini_set('pcre.backtrack_limit', $previous);
+            }
+        }
+
+        return $found === 1 && isset($match[1]) ? $this->text($match[1]) : null;
     }
 
     private function evaluate(DOMXPath $xpath, ?string $expression): ?string
@@ -170,6 +206,8 @@ class ProductExtractor
             'title' => $this->text($recipe['title'] ?? null),
             'price' => $this->text($recipe['price'] ?? null),
             'image' => $this->text($recipe['image'] ?? null),
+            'price_pattern' => $this->text($recipe['price_pattern'] ?? null),
+            'currency' => $this->text($recipe['currency'] ?? null),
         ];
     }
 
@@ -185,14 +223,16 @@ class ProductExtractor
      * Odchudza HTML przed wysłaniem do AI: bez skryptów, stylów i komentarzy,
      * a przy długich stronach tylko okolice nagłówka produktu.
      */
-    private function condense(string $html): string
+    public function condense(string $html): string
     {
         $clean = $html;
 
-        foreach (['#<(script|style|svg|noscript|template|iframe)\b[^>]*>.*?</\1>#is', '#<!--.*?-->#s'] as $pattern) {
+        foreach (['#<(script|style|svg|noscript|template|iframe)\b[^>]*>.*?</\1>#is', '#<!--.*?-->#s', '#<link\b[^>]*>#i'] as $pattern) {
             $clean = preg_replace($pattern, '', $clean) ?? $clean;
         }
 
+        // Atrybuty bez znaczenia dla przepisu tylko zjadają czas modelu.
+        $clean = preg_replace('#\s(?:style|srcset|sizes|data-rh|fetchpriority|loading|decoding)="[^"]*"#i', '', $clean) ?? $clean;
         $clean = Str::squish($clean);
 
         if (strlen($clean) <= self::PROMPT_BYTES) {
@@ -203,6 +243,32 @@ class ProductExtractor
         $start = $heading === false ? 0 : max(0, $heading - 3000);
 
         return mb_strcut($clean, $start, self::PROMPT_BYTES, 'UTF-8');
+    }
+
+    /**
+     * Wycinki danych ze skryptów strony wokół kluczy z ceną. Sklepy renderowane
+     * JavaScriptem (np. empik) trzymają cenę tylko tam, a nie w widocznym HTML-u.
+     */
+    public function scriptData(string $html): string
+    {
+        if (preg_match_all('#<script\b[^>]*>(.*?)</script>#is', $html, $scripts) === false) {
+            return '';
+        }
+
+        $snippets = [];
+
+        foreach ($scripts[1] as $script) {
+            if (preg_match_all('/"\w*price\w*"\s*:/i', $script, $keys, PREG_OFFSET_CAPTURE) === false) {
+                continue;
+            }
+
+            foreach ($keys[0] as [$key, $offset]) {
+                $start = max(0, $offset - 150);
+                $snippets[] = Str::squish(mb_strcut($script, $start, strlen($key) + 300, 'UTF-8'));
+            }
+        }
+
+        return mb_strcut(implode("\n", array_unique($snippets)), 0, self::SCRIPT_DATA_BYTES, 'UTF-8');
     }
 
     /**

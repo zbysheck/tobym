@@ -49,11 +49,25 @@ class ProductMetadataFetcher
 
     private function download(string $url): ?string
     {
+        return $this->trace($url)['html'];
+    }
+
+    /**
+     * Pobiera stronę i opisuje każdy krok, żeby dało się sprawdzić, gdzie pobieranie się wykłada.
+     *
+     * @return array{html: string|null, steps: list<string>}
+     */
+    public function trace(string $url): array
+    {
+        $steps = [];
+
         for ($hop = 0; $hop <= self::MAX_REDIRECTS; $hop++) {
             $target = $this->safeTarget($url);
 
             if ($target === null) {
-                return null;
+                $steps[] = 'Odrzucony adres (zły schemat lub port, host nie istnieje albo wskazuje na sieć prywatną): '.$url;
+
+                return ['html' => null, 'steps' => $steps];
             }
 
             $response = Http::withOptions([
@@ -71,11 +85,15 @@ class ProductMetadataFetcher
                 ->timeout(8)
                 ->get($url);
 
+            $steps[] = 'HTTP '.$response->status().' z '.$url.' ('.strlen($response->body()).' bajtów)';
+
             if ($response->redirect()) {
                 $location = $response->header('Location');
 
                 if ($location === '') {
-                    return null;
+                    $steps[] = 'Przekierowanie bez adresu docelowego.';
+
+                    return ['html' => null, 'steps' => $steps];
                 }
 
                 $url = Urls::absolute($location, $url);
@@ -84,13 +102,17 @@ class ProductMetadataFetcher
             }
 
             if (! $response->successful()) {
-                return null;
+                $steps[] = 'Sklep odmówił (kod inny niż 2xx).';
+
+                return ['html' => null, 'steps' => $steps];
             }
 
-            return substr($response->body(), 0, self::MAX_BYTES);
+            return ['html' => substr($response->body(), 0, self::MAX_BYTES), 'steps' => $steps];
         }
 
-        return null;
+        $steps[] = 'Za dużo przekierowań.';
+
+        return ['html' => null, 'steps' => $steps];
     }
 
     /**
