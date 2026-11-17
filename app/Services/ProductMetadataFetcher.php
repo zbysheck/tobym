@@ -26,13 +26,14 @@ class ProductMetadataFetcher
     public function fetch(string $url, bool $allowAi = true): ProductMetadata
     {
         $host = Urls::host($url);
-        $fallback = new ProductMetadata($host ?? 'Prezent', $host, null, null);
+        $fallback = new ProductMetadata(Urls::titleFromPath($url) ?? $host ?? 'Prezent', $host, null, null);
 
         try {
             $html = $this->download($url);
 
             if ($html === null) {
-                return $fallback;
+                // Sklep nie wpuszcza serwera (np. zabezpieczenie przed botami).
+                return new ProductMetadata($fallback->title, $fallback->shop, null, null, blocked: true);
             }
 
             $fields = $this->extractor->extract($html, $url, $allowAi);

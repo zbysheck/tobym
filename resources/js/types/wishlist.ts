@@ -41,6 +41,7 @@ export type GiftPreview = {
     image_url: string | null;
     price: string | null;
     pending: boolean;
+    blocked?: boolean;
 };
 
 export type GiftDetails = {

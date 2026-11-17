@@ -21,6 +21,7 @@ declare module '@inertiajs/core' {
             auth: Auth;
             flash: { status: string | null };
             hasLists: boolean;
+            myLists: { slug: string; title: string }[];
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

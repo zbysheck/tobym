@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Wishlist;
 use App\Support\CurrentWishlist;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -44,6 +45,11 @@ class HandleInertiaRequests extends Middleware
             ],
             // Czy odwiedzający ma jakąkolwiek listę (link "Moje listy" w nagłówku).
             'hasLists' => fn () => app(CurrentWishlist::class)->query($request)?->exists() ?? false,
+            // Listy odwiedzającego do wyboru przy dodawaniu prezentu (wklejanie linku działa na każdej stronie).
+            'myLists' => fn () => app(CurrentWishlist::class)->all($request)
+                ->map(fn (Wishlist $list): array => ['slug' => $list->slug, 'title' => $list->title])
+                ->values()
+                ->all(),
             'flash' => [
                 'status' => $request->session()->get('status'),
             ],

@@ -1,12 +1,25 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
+import { ref } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
+import GiftCapture from '@/components/GiftCapture.vue';
 import SiteFooter from '@/components/SiteFooter.vue';
 import { allThemeFontsUrl } from '@/lib/themes';
 
 defineProps<{
     listUrl: string | null;
 }>();
+
+const capture = ref<InstanceType<typeof GiftCapture> | null>(null);
+const heroUrl = ref('');
+
+function addFromHero(): void {
+    const link = heroUrl.value.trim();
+
+    if (link !== '') {
+        void capture.value?.addLink(link);
+    }
+}
 
 const steps = [
     {
@@ -177,6 +190,35 @@ const faq = [
                             >Jak to działa</a
                         >
                     </div>
+                    <form
+                        class="skin-outline flex w-full max-w-xl flex-wrap gap-2 rounded-card bg-surface p-2 shadow-card"
+                        @submit.prevent="addFromHero"
+                    >
+                        <label for="hero-url" class="sr-only"
+                            >Link do prezentu</label
+                        >
+                        <input
+                            id="hero-url"
+                            v-model="heroUrl"
+                            type="url"
+                            inputmode="url"
+                            placeholder="Masz już link? Wklej go tutaj"
+                            class="h-12 min-w-0 flex-[1_1_14rem] rounded-control bg-transparent px-3 text-base text-ink placeholder:text-muted"
+                        />
+                        <button
+                            type="submit"
+                            :disabled="capture?.loading"
+                            class="skin-outline press h-12 rounded-control bg-ink px-5 text-base font-semibold text-ground disabled:opacity-60"
+                        >
+                            {{
+                                capture?.loading ? 'Pobieram…' : 'Dodaj prezent'
+                            }}
+                        </button>
+                    </form>
+                    <p class="-mt-3 hidden text-sm text-muted sm:block">
+                        Albo wklej link (Ctrl+V) w dowolnym miejscu strony czy
+                        przeciągnij go tutaj.
+                    </p>
                 </div>
 
                 <figure
@@ -415,5 +457,6 @@ const faq = [
         </main>
 
         <SiteFooter />
+        <GiftCapture ref="capture" />
     </div>
 </template>

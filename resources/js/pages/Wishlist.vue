@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import AddGiftDialog from '@/components/AddGiftDialog.vue';
 import AppHeader from '@/components/AppHeader.vue';
+import GiftCapture from '@/components/GiftCapture.vue';
 import GiftItem from '@/components/GiftItem.vue';
 import DropOverlay from '@/components/DropOverlay.vue';
 import ImageLightbox from '@/components/ImageLightbox.vue';
@@ -658,6 +659,7 @@ const listClass = computed(() =>
         />
 
         <DropOverlay :visible="dragging" />
+        <GiftCapture v-if="!editable" />
 
         <ImageLightbox
             :src="zoomed ? (zoomed.image_large ?? zoomed.image_url) : null"

@@ -10,5 +10,6 @@ final readonly class ProductMetadata
         public ?string $imageUrl,
         public ?string $price,
         public bool $improvable = false,
+        public bool $blocked = false,
     ) {}
 }

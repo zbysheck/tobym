@@ -266,6 +266,13 @@ function onClose(): void {
                         />
                         Bardzo chcę
                     </label>
+                    <p
+                        v-if="preview.blocked"
+                        class="rounded-control bg-tile px-3 py-2 text-sm text-ink"
+                    >
+                        Ten sklep nie pozwala nam odczytać strony. Nazwę
+                        wzięliśmy z adresu, sprawdź ją i dopisz cenę.
+                    </p>
                     <p v-if="preview.shop" class="truncate text-sm text-muted">
                         {{ preview.shop }}
                     </p>

@@ -34,6 +34,7 @@ class WishlistItemController extends Controller
             'image_url' => $metadata->imageUrl,
             'price' => $metadata->price,
             'pending' => $metadata->improvable,
+            'blocked' => $metadata->blocked,
         ]);
     }
 
