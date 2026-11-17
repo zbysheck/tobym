@@ -126,7 +126,12 @@ function blurOnEnter(event: KeyboardEvent): void {
                 alt=""
                 loading="lazy"
                 referrerpolicy="no-referrer"
-                class="h-full w-full object-cover"
+                class="h-full w-full"
+                :class="
+                    item.image_url.startsWith('/storage/')
+                        ? 'object-cover'
+                        : 'bg-white object-contain p-2'
+                "
             />
             <span v-else class="px-2 text-center text-sm text-ink"
                 >bez zdjęcia</span
