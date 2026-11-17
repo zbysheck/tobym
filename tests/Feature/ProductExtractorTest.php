@@ -111,4 +111,17 @@ class ProductExtractorTest extends TestCase
         $this->assertSame('Ekspres przelewowy', $fields['title']);
         $this->assertNull($fields['price']);
     }
+
+    public function test_shop_suffixes_are_removed_from_titles(): void
+    {
+        $extractor = app(ProductExtractor::class);
+
+        $this->assertSame(
+            'Sony WF-1000XM5 Czarne (Słuchawki)',
+            $extractor->cleanTitle('Sony WF-1000XM5 Czarne (Słuchawki) - cena, raty - sklep Komputronik.pl', 'www.komputronik.pl'),
+        );
+        $this->assertSame('LEGO Technic Bolid F1 (42207)', $extractor->cleanTitle('LEGO Technic Bolid F1 (42207) - Morele.net', 'www.morele.net'));
+        $this->assertSame('Kubek - Duży', $extractor->cleanTitle('Kubek - Duży', 'sklep.example'));
+        $this->assertSame('Koc wełniany', $extractor->cleanTitle('Amazon.pl: Koc wełniany', 'www.amazon.pl'));
+    }
 }

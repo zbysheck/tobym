@@ -2,7 +2,8 @@ import { router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { celebrate } from '@/lib/celebrate';
 import { toast } from '@/lib/ui';
-import { fetchPreview } from '@/lib/wishlist';
+import { hasAddon, readPageWithAddon } from '@/lib/addon';
+import { fetchPreview, fetchPreviewFromHtml } from '@/lib/wishlist';
 import type { GiftDetails, GiftPreview } from '@/types';
 
 /**
@@ -38,6 +39,12 @@ export function useGiftAdder(onAdded?: () => void) {
 
         preview.value = quick.preview;
 
+        if (quick.preview.blocked && hasAddon()) {
+            await completeWithAddon(link);
+
+            return;
+        }
+
         if (!quick.preview.pending) {
             return;
         }
@@ -58,6 +65,37 @@ export function useGiftAdder(onAdded?: () => void) {
             price: current.price ?? deep.preview.price,
             shop: current.shop ?? deep.preview.shop,
             pending: false,
+        };
+    }
+
+    /** Sklep nie wpuszcza serwera: addon czyta produkt w przeglądarce użytkownika. */
+    async function completeWithAddon(link: string): Promise<void> {
+        enriching.value = true;
+        const html = await readPageWithAddon(link);
+        const result =
+            html === null ? null : await fetchPreviewFromHtml(link, html);
+        enriching.value = false;
+
+        const current = preview.value;
+
+        if (current?.url !== link) {
+            return;
+        }
+
+        if (result === null || !result.ok) {
+            preview.value = { ...current, viaAddon: true };
+
+            return;
+        }
+
+        preview.value = {
+            ...current,
+            title: result.preview.title,
+            image_url: result.preview.image_url ?? current.image_url,
+            price: result.preview.price ?? current.price,
+            shop: result.preview.shop ?? current.shop,
+            pending: false,
+            blocked: false,
         };
     }
 

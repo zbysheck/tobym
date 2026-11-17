@@ -35,6 +35,32 @@ class WishlistItemController extends Controller
             'price' => $metadata->price,
             'pending' => $metadata->improvable,
             'blocked' => $metadata->blocked,
+            'gone' => $metadata->gone,
+        ]);
+    }
+
+    /**
+     * Podgląd z HTML, który addon odczytał w przeglądarce użytkownika (gdy sklep nie wpuszcza serwera).
+     * AI może przy tym nauczyć się przepisu dla sklepu, więc kolejne strony idą już bez niego.
+     */
+    public function previewHtml(Request $request, ProductMetadataFetcher $fetcher): JsonResponse
+    {
+        $url = $this->validatedUrl($request);
+        $request->validate(['html' => ['required', 'string']]);
+
+        set_time_limit(150);
+        $html = mb_strcut($request->string('html')->toString(), 0, 3_000_000, 'UTF-8');
+        $metadata = $fetcher->fromHtml($url, $html);
+
+        return response()->json([
+            'url' => $url,
+            'title' => $metadata->title,
+            'shop' => $metadata->shop,
+            'image_url' => $metadata->imageUrl,
+            'price' => $metadata->price,
+            'pending' => false,
+            'blocked' => false,
+            'gone' => false,
         ]);
     }
 

@@ -31,6 +31,7 @@ Route::post('/l/{wishlist}/items/{item}/reservation', [ReservationController::cl
 Route::delete('/l/{wishlist}/items/{item}/reservation', [ReservationController::class, 'destroy'])->name('reservations.destroy');
 
 Route::post('/items/preview', [WishlistItemController::class, 'preview'])->middleware('throttle:30,1')->name('items.preview');
+Route::post('/items/preview-html', [WishlistItemController::class, 'previewHtml'])->middleware('throttle:20,1')->name('items.preview-html');
 Route::post('/items', [WishlistItemController::class, 'storeCurrent'])->middleware('throttle:30,1')->name('items.store-current');
 Route::patch('/items/{item}', [WishlistItemController::class, 'update'])->name('items.update');
 Route::post('/items/{item}/photo', [WishlistItemController::class, 'photo'])->middleware('throttle:20,1')->name('items.photo');

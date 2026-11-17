@@ -267,11 +267,26 @@ function onClose(): void {
                         Bardzo chcę
                     </label>
                     <p
-                        v-if="preview.blocked"
+                        v-if="preview.gone"
                         class="rounded-control bg-tile px-3 py-2 text-sm text-ink"
                     >
-                        Ten sklep nie pozwala nam odczytać strony. Nazwę
-                        wzięliśmy z adresu, sprawdź ją i dopisz cenę.
+                        Sklep mówi, że tego produktu już nie ma. Nazwę wzięliśmy
+                        z adresu, sprawdź, czy link jest aktualny.
+                    </p>
+                    <p
+                        v-else-if="preview.blocked && !enriching"
+                        class="rounded-control bg-tile px-3 py-2 text-sm text-ink"
+                    >
+                        <template v-if="preview.viaAddon">
+                            Nie udało się odczytać strony nawet przez wtyczkę.
+                            Nazwę wzięliśmy z adresu, sprawdź ją i dopisz cenę.
+                        </template>
+                        <template v-else>
+                            Ten sklep nie pozwala nam odczytać strony. Nazwę
+                            wzięliśmy z adresu, sprawdź ją i dopisz cenę. Z
+                            wtyczką Tobym dla Chrome takie sklepy uzupełniają
+                            się same.
+                        </template>
                     </p>
                     <p v-if="preview.shop" class="truncate text-sm text-muted">
                         {{ preview.shop }}
@@ -281,7 +296,11 @@ function onClose(): void {
                         role="status"
                         class="text-sm text-muted"
                     >
-                        Uzupełniam brakujące dane, możesz już dodać…
+                        {{
+                            preview.blocked
+                                ? 'Czytam stronę sklepu przez wtyczkę…'
+                                : 'Uzupełniam brakujące dane, możesz już dodać…'
+                        }}
                     </p>
                     <p
                         v-for="(message, field) in errors"

@@ -42,6 +42,8 @@ export type GiftPreview = {
     price: string | null;
     pending: boolean;
     blocked?: boolean;
+    gone?: boolean;
+    viaAddon?: boolean;
 };
 
 export type GiftDetails = {

@@ -63,6 +63,29 @@ class WishlistTest extends TestCase
         $this->assertDatabaseCount('wishlist_items', 0);
     }
 
+    public function test_the_preview_reads_html_sent_by_the_addon(): void
+    {
+        Http::preventStrayRequests();
+
+        $html = '<html><head><meta property="og:title" content="Słuchawki Sony">'
+            .'<meta property="og:image" content="https://sklep.example/s.jpg">'
+            .'<meta property="product:price:amount" content="399.00">'
+            .'<meta property="product:price:currency" content="PLN"></head><body></body></html>';
+
+        $this->postJson(route('items.preview-html'), ['url' => 'https://sklep.example/p/1', 'html' => $html])
+            ->assertOk()
+            ->assertJson(['title' => 'Słuchawki Sony', 'price' => '399 zł', 'blocked' => false]);
+    }
+
+    public function test_a_removed_product_is_reported_as_gone(): void
+    {
+        Http::fake(['*' => Http::response('nie ma', 410)]);
+
+        $this->postJson(route('items.preview'), ['url' => 'https://93.184.216.34/produkt-lego'])
+            ->assertOk()
+            ->assertJson(['gone' => true, 'blocked' => false]);
+    }
+
     public function test_the_first_gift_moves_the_list_to_its_own_address(): void
     {
         Http::preventStrayRequests();

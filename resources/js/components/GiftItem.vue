@@ -30,6 +30,10 @@ watch(
 );
 
 const rows = computed(() => props.layout === 'rows');
+// Bez zdjęcia: kafelek z nazwą sklepu zamiast pustego miejsca.
+const shopLabel = computed(() =>
+    (props.item.shop ?? '').replace(/^https?:\/\//, '').replace(/^www\./, ''),
+);
 const editingTitle = ref(false);
 const titleField = ref<HTMLTextAreaElement | null>(null);
 const editingNote = ref(false);
@@ -212,22 +216,33 @@ function blurOnEnter(event: KeyboardEvent): void {
                     "
                 />
             </button>
-            <svg
+            <div
                 v-else
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                class="h-12 w-12 text-ink opacity-40"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.4"
-                stroke-linejoin="round"
+                class="flex max-w-full flex-col items-center gap-1.5 px-3 text-center"
             >
-                <rect x="3.5" y="9" width="17" height="11.5" rx="2" />
-                <rect x="2.5" y="6" width="19" height="4" rx="1.5" />
-                <path
-                    d="M12 6v14.5M12 6C10 2.5 6.5 2.5 7 5s5 1 5 1Zm0 0c2-3.5 5.5-3.5 5-1s-5 1-5 1Z"
-                />
-            </svg>
+                <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    class="text-ink opacity-40"
+                    :class="shopLabel ? 'h-9 w-9' : 'h-12 w-12'"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linejoin="round"
+                >
+                    <rect x="3.5" y="9" width="17" height="11.5" rx="2" />
+                    <rect x="2.5" y="6" width="19" height="4" rx="1.5" />
+                    <path
+                        d="M12 6v14.5M12 6C10 2.5 6.5 2.5 7 5s5 1 5 1Zm0 0c2-3.5 5.5-3.5 5-1s-5 1-5 1Z"
+                    />
+                </svg>
+                <span
+                    v-if="shopLabel"
+                    class="skin-display max-w-full truncate font-semibold text-ink opacity-60"
+                    :class="rows ? 'text-sm' : 'text-lg'"
+                    >{{ shopLabel }}</span
+                >
+            </div>
             <label
                 v-if="editable"
                 :aria-label="`Zmień zdjęcie: ${item.title}`"

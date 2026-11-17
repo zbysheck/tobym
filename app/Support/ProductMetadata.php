@@ -11,5 +11,6 @@ final readonly class ProductMetadata
         public ?string $price,
         public bool $improvable = false,
         public bool $blocked = false,
+        public bool $gone = false,
     ) {}
 }

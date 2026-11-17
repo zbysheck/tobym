@@ -19,29 +19,44 @@ export type PreviewResult =
     | { ok: true; preview: GiftPreview }
     | { ok: false; error: string };
 
-export async function fetchPreview(
+export function fetchPreview(
     link: string,
     deep: boolean,
 ): Promise<PreviewResult> {
+    return postPreview('/items/preview', { url: link, deep });
+}
+
+/** Podgląd z HTML odczytanego przez addon w przeglądarce użytkownika. */
+export function fetchPreviewFromHtml(
+    link: string,
+    html: string,
+): Promise<PreviewResult> {
+    return postPreview('/items/preview-html', { url: link, html });
+}
+
+async function postPreview(
+    path: string,
+    body: Record<string, unknown>,
+): Promise<PreviewResult> {
     try {
-        const response = await fetch('/items/preview', {
+        const response = await fetch(path, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
                 'X-XSRF-TOKEN': xsrfToken(),
             },
-            body: JSON.stringify({ url: link, deep }),
+            body: JSON.stringify(body),
         });
 
         if (response.status === 422) {
-            const body = (await response.json()) as {
+            const data = (await response.json()) as {
                 errors?: Record<string, string[]>;
             };
 
             return {
                 ok: false,
-                error: body.errors?.url?.[0] ?? 'Nie udało się odczytać linku.',
+                error: data.errors?.url?.[0] ?? 'Nie udało się odczytać linku.',
             };
         }
 

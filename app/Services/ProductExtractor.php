@@ -63,7 +63,7 @@ class ProductExtractor
         $fields['title'] ??= $this->text($xpath->evaluate('string(//title)'));
 
         if ($fields['title'] !== null) {
-            $fields['title'] = Str::limit($fields['title'], 500, '…');
+            $fields['title'] = Str::limit($this->cleanTitle($fields['title'], $domain), 500, '…');
         }
 
         if ($fields['image'] !== null) {
@@ -71,6 +71,32 @@ class ProductExtractor
         }
 
         return $fields;
+    }
+
+    /**
+     * Usuwa doklejki sklepu z tytułu, np. "Słuchawki X - cena, raty - sklep Komputronik.pl" → "Słuchawki X".
+     */
+    public function cleanTitle(string $title, ?string $domain): string
+    {
+        $shop = $domain === null ? null : preg_replace('/[^a-z0-9]/', '', explode('.', preg_replace('/^www\./', '', $domain) ?? $domain)[0]);
+        $noise = '/\b(sklep|sklepie|cena|ceny|raty|opinie|kup|kupuj|zamów|dostawa|promocja)\b/iu';
+
+        if ($shop !== null && $shop !== '') {
+            $title = preg_replace('/^'.preg_quote($shop, '/').'[\w.]*\s*:\s*/iu', '', $title) ?? $title;
+        }
+
+        while (preg_match('/^(.+)\s+[|–—-]\s+(.+?)$/u', $title, $match) === 1) {
+            $tail = mb_strtolower($match[2]);
+            $isShop = $shop !== null && $shop !== '' && str_contains(preg_replace('/[^\p{L}\p{N}]/u', '', $tail) ?? $tail, $shop);
+
+            if (! $isShop && preg_match($noise, $tail) !== 1) {
+                break;
+            }
+
+            $title = $match[1];
+        }
+
+        return trim($title);
     }
 
     private function xpath(string $html): ?DOMXPath
