@@ -7,6 +7,7 @@ use App\Enums\Theme;
 use App\Models\Wishlist;
 use App\Models\WishlistItem;
 use App\Support\CurrentWishlist;
+use App\Support\GuestToken;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -27,12 +28,14 @@ class WishlistController extends Controller
             return redirect()->route('wishlist.show', $wishlist);
         }
 
-        return $this->render(null, editable: true);
+        return $this->render(null, editable: true, guestToken: null);
     }
 
-    public function show(Request $request, CurrentWishlist $current, Wishlist $wishlist): Response
+    public function show(Request $request, CurrentWishlist $current, GuestToken $guest, Wishlist $wishlist): Response
     {
-        return $this->render($wishlist, editable: $current->find($request)?->id === $wishlist->id);
+        $editable = $current->find($request)?->id === $wishlist->id;
+
+        return $this->render($wishlist, $editable, $editable ? null : $guest->hash($request));
     }
 
     public function update(Request $request, CurrentWishlist $current): RedirectResponse
@@ -49,10 +52,16 @@ class WishlistController extends Controller
         return redirect()->route('wishlist.show', $wishlist);
     }
 
-    private function render(?Wishlist $wishlist, bool $editable): Response
+    /**
+     * Właściciel (editable) nigdy nie dostaje informacji o rezerwacjach, żeby prezenty były niespodzianką.
+     */
+    private function render(?Wishlist $wishlist, bool $editable, ?string $guestToken): Response
     {
+        $wishlist?->load('items.reservation');
+
         return Inertia::render('Wishlist', [
             'editable' => $editable,
+            'slug' => $wishlist?->slug,
             'shareUrl' => $wishlist === null ? null : route('wishlist.show', $wishlist),
             'wishlist' => [
                 'title' => $wishlist->title ?? Wishlist::DEFAULT_TITLE,
@@ -66,6 +75,10 @@ class WishlistController extends Controller
                         'shop' => $item->shop,
                         'image_url' => $item->image_url,
                         'price' => $item->price,
+                        'reservation' => $editable || $item->reservation === null ? null : [
+                            'name' => $item->reservation->name,
+                            'mine' => $guestToken !== null && hash_equals($item->reservation->guest_token, $guestToken),
+                        ],
                     ])
                     ->values()
                     ->all(),

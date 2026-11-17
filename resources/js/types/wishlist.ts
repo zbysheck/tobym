@@ -5,6 +5,7 @@ export type WishlistItem = {
     shop: string | null;
     image_url: string | null;
     price: string | null;
+    reservation: { name: string; mine: boolean } | null;
 };
 
 export type WishlistLayout = 'tiles' | 'rows';

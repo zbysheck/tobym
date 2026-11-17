@@ -9,6 +9,11 @@ const props = defineProps<{
     editable: boolean;
 }>();
 
+const emit = defineEmits<{
+    reserve: [item: WishlistItem];
+    unreserve: [item: WishlistItem];
+}>();
+
 const rows = computed(() => props.layout === 'rows');
 const editingTitle = ref(false);
 const titleField = ref<HTMLTextAreaElement | null>(null);
@@ -62,7 +67,12 @@ function blurOnEnter(event: KeyboardEvent): void {
 <template>
     <li
         class="skin-outline overflow-hidden rounded-card bg-surface shadow-card"
-        :class="rows ? 'flex items-stretch' : 'flex flex-col'"
+        :class="[
+            rows ? 'flex items-stretch' : 'flex flex-col',
+            !editable && item.reservation && !item.reservation.mine
+                ? 'opacity-60'
+                : '',
+        ]"
     >
         <div
             class="skin-outline flex flex-none items-center justify-center bg-tile"
@@ -182,6 +192,36 @@ function blurOnEnter(event: KeyboardEvent): void {
                         <path d="M6 6l1 14h10l1-14" />
                     </svg>
                 </button>
+            </div>
+            <div
+                v-if="!editable"
+                class="flex flex-wrap items-center gap-2"
+                :class="rows ? 'flex-[0_1_14rem]' : ''"
+            >
+                <template v-if="item.reservation === null">
+                    <button
+                        type="button"
+                        class="skin-outline h-11 flex-1 rounded-control bg-accent px-4 text-[15px] font-semibold text-on-accent"
+                        @click="emit('reserve', item)"
+                    >
+                        Rezerwuję
+                    </button>
+                </template>
+                <template v-else-if="item.reservation.mine">
+                    <p class="flex-1 text-sm font-semibold">
+                        Zarezerwowane przez Ciebie
+                    </p>
+                    <button
+                        type="button"
+                        class="h-11 px-2 text-sm text-muted underline underline-offset-4"
+                        @click="emit('unreserve', item)"
+                    >
+                        Cofnij
+                    </button>
+                </template>
+                <p v-else class="text-sm font-semibold">
+                    Kupuje: {{ item.reservation.name }}
+                </p>
             </div>
         </div>
     </li>

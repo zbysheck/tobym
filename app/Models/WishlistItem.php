@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -28,5 +29,13 @@ class WishlistItem extends Model
     public function wishlist(): BelongsTo
     {
         return $this->belongsTo(Wishlist::class);
+    }
+
+    /**
+     * @return HasOne<Reservation, $this>
+     */
+    public function reservation(): HasOne
+    {
+        return $this->hasOne(Reservation::class);
     }
 }

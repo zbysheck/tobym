@@ -3,6 +3,7 @@ import { Head, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import AddGiftDialog from '@/components/AddGiftDialog.vue';
 import GiftItem from '@/components/GiftItem.vue';
+import ReserveDialog from '@/components/ReserveDialog.vue';
 import type {
     GiftPreview,
     ThemeOption,
@@ -17,6 +18,7 @@ const props = defineProps<{
     wishlist: WishlistData;
     themes: ThemeOption[];
     editable: boolean;
+    slug: string | null;
     shareUrl: string | null;
 }>();
 
@@ -58,6 +60,7 @@ const email = ref('');
 const sending = ref(false);
 
 const search = ref('');
+const onlyFree = ref(false);
 const sort = ref<SortKey>('added');
 const shop = ref('');
 
@@ -97,6 +100,7 @@ const visibleItems = computed(() => {
     const items = props.wishlist.items.filter(
         (item) =>
             (shop.value === '' || item.shop === shop.value) &&
+            (!onlyFree.value || item.reservation === null) &&
             (phrase === '' || item.title.toLowerCase().includes(phrase)),
     );
 
@@ -326,6 +330,57 @@ async function copyLink(): Promise<void> {
     }
 }
 
+const NAME_KEY = 'tobym:guest-name';
+const reserving = ref<WishlistItem | null>(null);
+const guestName = ref(readGuestName());
+
+function readGuestName(): string {
+    try {
+        return window.localStorage.getItem(NAME_KEY) ?? '';
+    } catch {
+        return '';
+    }
+}
+
+function reservationUrl(item: WishlistItem): string {
+    return `/l/${props.slug ?? ''}/items/${item.id}/reservation`;
+}
+
+function startReserving(item: WishlistItem): void {
+    reserving.value = item;
+}
+
+function confirmReservation(name: string): void {
+    const item = reserving.value;
+
+    if (item === null) {
+        return;
+    }
+
+    guestName.value = name;
+
+    try {
+        window.localStorage.setItem(NAME_KEY, name);
+    } catch {
+        // Bez pamięci przeglądarki imię trzeba będzie podać ponownie.
+    }
+
+    router.post(
+        reservationUrl(item),
+        { name },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                reserving.value = null;
+            },
+        },
+    );
+}
+
+function cancelReservation(item: WishlistItem): void {
+    router.delete(reservationUrl(item), { preserveScroll: true });
+}
+
 function onThemeChange(event: Event): void {
     setTheme((event.target as HTMLSelectElement).value);
 }
@@ -416,7 +471,7 @@ function blurOnEnter(event: KeyboardEvent): void {
             </header>
 
             <p
-                v-if="user && status"
+                v-if="status && (user || !editable)"
                 role="status"
                 class="skin-outline rounded-control bg-surface px-4 py-3 text-[15px]"
             >
@@ -617,6 +672,17 @@ function blurOnEnter(event: KeyboardEvent): void {
                                 </option>
                             </select>
                         </div>
+                        <label
+                            v-if="!editable"
+                            class="flex h-11 items-center gap-2 text-[15px]"
+                        >
+                            <input
+                                v-model="onlyFree"
+                                type="checkbox"
+                                class="h-5 w-5 accent-accent"
+                            />
+                            Tylko wolne
+                        </label>
                     </div>
 
                     <p
@@ -652,11 +718,20 @@ function blurOnEnter(event: KeyboardEvent): void {
                             :item="item"
                             :layout="layout"
                             :editable="editable"
+                            @reserve="startReserving"
+                            @unreserve="cancelReservation"
                         />
                     </TransitionGroup>
                 </main>
             </div>
         </div>
+
+        <ReserveDialog
+            :gift-title="reserving?.title ?? null"
+            :initial-name="guestName"
+            @confirm="confirmReservation"
+            @cancel="reserving = null"
+        />
 
         <AddGiftDialog
             :preview="preview"
