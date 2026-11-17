@@ -1,13 +1,19 @@
 <?php
 
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AddonController;
 use App\Http\Controllers\LoginLinkController;
+use App\Http\Controllers\PageController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\WishlistController;
 use App\Http\Controllers\WishlistItemController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [WishlistController::class, 'home'])->name('home');
+Route::get('/', [PageController::class, 'home'])->name('home');
+Route::get('/jak-to-dziala', [PageController::class, 'about'])->name('about');
+Route::get('/prywatnosc', [PageController::class, 'privacy'])->name('privacy');
+Route::get('/start', [WishlistController::class, 'start'])->name('start');
+Route::delete('/account', [AccountController::class, 'destroy'])->middleware('auth')->name('account.destroy');
 Route::patch('/list', [WishlistController::class, 'updateCurrent'])->name('wishlist.update-current');
 Route::post('/lists', [WishlistController::class, 'store'])->middleware('throttle:20,1')->name('wishlists.store');
 

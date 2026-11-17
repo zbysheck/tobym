@@ -9,7 +9,8 @@ const FONTS: Record<string, string> = {
 };
 
 export function themeFontsUrl(theme: string): string {
-    const families = FONTS[theme] ?? FONTS.swiateczna;
+    // Krój logo (DM Serif Display) jest potrzebny na każdej stronie, niezależnie od skórki.
+    const families = `${FONTS[theme] ?? FONTS.swiateczna}|dm-serif-display:400`;
 
     return `https://fonts.bunny.net/css?family=${families}&display=swap`;
 }

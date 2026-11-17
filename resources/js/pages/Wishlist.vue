@@ -3,10 +3,12 @@ import { Head, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import AddGiftDialog from '@/components/AddGiftDialog.vue';
+import AppLogo from '@/components/AppLogo.vue';
 import GiftItem from '@/components/GiftItem.vue';
 import ListSidebar from '@/components/ListSidebar.vue';
 import QrDialog from '@/components/QrDialog.vue';
 import ReserveDialog from '@/components/ReserveDialog.vue';
+import SiteFooter from '@/components/SiteFooter.vue';
 import {
     countdown,
     fetchPreview,
@@ -445,7 +447,7 @@ const listClass = computed(() =>
             <header
                 class="flex flex-wrap items-center justify-between gap-4 py-5"
             >
-                <a href="/" class="skin-display text-[26px] text-ink">tobym</a>
+                <AppLogo />
                 <button
                     v-if="user"
                     type="button"
@@ -646,6 +648,8 @@ const listClass = computed(() =>
                 </main>
             </div>
         </div>
+
+        <SiteFooter />
 
         <ReserveDialog
             :gift-title="reserving?.title ?? null"

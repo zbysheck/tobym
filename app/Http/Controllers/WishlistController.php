@@ -21,10 +21,10 @@ class WishlistController extends Controller
     private const UNLOCKED = 'unlocked_lists';
 
     /**
-     * Strona główna: jeśli odwiedzający ma już listę, przenosi pod adres najnowszej,
-     * a jeśli nie, pokazuje pustą listę gotową do dodania pierwszego prezentu.
+     * Pusta lista gotowa do dodania pierwszego prezentu (lista powstaje przy pierwszej zmianie).
+     * Kto ma już listę, trafia do niej.
      */
-    public function home(Request $request, CurrentWishlist $current): Response|RedirectResponse
+    public function start(Request $request, CurrentWishlist $current): Response|RedirectResponse
     {
         $wishlist = $current->find($request);
 

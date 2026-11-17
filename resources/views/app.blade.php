@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}"  @class(['dark' => ($appearance ?? 'system') == 'dark'])>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,6 +7,12 @@
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        <meta name="theme-color" content="#17392c">
+
+        @unless ($indexable ?? false)
+            {{-- Listy prezentów są prywatne: nie chcemy ich w wynikach wyszukiwania. --}}
+            <meta name="robots" content="noindex, nofollow">
+        @endunless
 
         @isset($og)
             <meta property="og:type" content="website">
