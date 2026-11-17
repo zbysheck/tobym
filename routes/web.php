@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AddonController;
 use App\Http\Controllers\LoginLinkController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\WishlistController;
@@ -30,4 +31,7 @@ Route::delete('/items/{item}', [WishlistItemController::class, 'destroy'])->name
 Route::post('/login-link', [LoginLinkController::class, 'store'])->middleware('throttle:5,1')->name('login.link');
 Route::get('/login/{user}', [LoginLinkController::class, 'confirm'])->middleware('signed')->name('login.verify');
 Route::post('/login/{user}', [LoginLinkController::class, 'verify'])->middleware('signed')->name('login.confirm');
+Route::get('/addon/connect', [AddonController::class, 'connectPage'])->name('addon.connect');
+Route::post('/addon/connect', [AddonController::class, 'connect'])->middleware('throttle:10,1')->name('addon.connect.store');
+
 Route::post('/logout', [LoginLinkController::class, 'destroy'])->name('logout');

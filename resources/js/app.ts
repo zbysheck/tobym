@@ -8,7 +8,7 @@ void createInertiaApp({
         app.directive('focus', {
             mounted: (el: HTMLElement, shouldFocus) => {
                 if (shouldFocus.value !== false) {
-                    el.focus();
+                    el.focus({ preventScroll: true });
                 }
             },
         });

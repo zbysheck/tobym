@@ -1,11 +1,24 @@
 {
     "manifest_version": 3,
     "name": "Tobym",
-    "description": "Dodaj prezent do swojej wishlisty z dowolnej strony.",
-    "version": "0.0.1",
+    "description": "Dodaj prezent do swojej listy Tobym z dowolnego sklepu jednym kliknięciem.",
+    "version": "0.1.0",
     "action": {
-        "default_title": "Tobym",
+        "default_title": "Dodaj do listy Tobym",
         "default_popup": "popup.html"
     },
-    "permissions": ["activeTab"]
+    "permissions": ["activeTab", "scripting", "storage"],
+    "host_permissions": [
+        "https://tobym.zbigniewkisly.usermd.net/*",
+        "http://tobym.test/*"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "https://tobym.zbigniewkisly.usermd.net/addon/connect*",
+                "http://tobym.test/addon/connect*"
+            ],
+            "js": ["connect.js"]
+        }
+    ]
 }

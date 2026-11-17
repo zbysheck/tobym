@@ -2,29 +2,122 @@
 <html lang="pl">
     <head>
         <meta charset="utf-8" />
+        <title>Tobym</title>
         <style>
+            :root {
+                --ink: #17392c;
+                --muted: #55695e;
+                --line: #d9cfba;
+                --ground: #faf6ee;
+                --accent: #b5302a;
+            }
             body {
                 font:
-                    14px system-ui,
+                    14px/1.4 system-ui,
                     sans-serif;
                 margin: 0;
                 padding: 16px;
-                width: 280px;
+                width: 300px;
+                color: var(--ink);
+                background: var(--ground);
             }
             h1 {
-                font-size: 16px;
-                margin: 0 0 8px;
+                font:
+                    600 18px/1.2 Georgia,
+                    serif;
+                margin: 0 0 12px;
             }
             p {
-                margin: 0;
-                color: #555;
-                word-break: break-all;
+                margin: 0 0 10px;
+            }
+            .muted {
+                color: var(--muted);
+            }
+            label {
+                display: block;
+                font-weight: 600;
+                margin: 0 0 6px;
+            }
+            select,
+            button {
+                width: 100%;
+                min-height: 40px;
+                border: 1px solid var(--line);
+                border-radius: 8px;
+                font: inherit;
+                margin: 0 0 10px;
+                padding: 0 10px;
+                background: #fff;
+                color: var(--ink);
+            }
+            button.primary {
+                background: var(--accent);
+                border-color: var(--accent);
+                color: #fff;
+                font-weight: 600;
+                cursor: pointer;
+            }
+            button:disabled {
+                opacity: 0.6;
+            }
+            .result {
+                display: flex;
+                gap: 10px;
+                align-items: center;
+                margin: 0 0 10px;
+            }
+            .result img {
+                width: 56px;
+                height: 56px;
+                object-fit: cover;
+                border-radius: 6px;
+                background: #efe7d6;
+            }
+            a {
+                color: var(--ink);
+            }
+            [hidden] {
+                display: none !important;
             }
         </style>
     </head>
     <body>
         <h1>Tobym</h1>
-        <p id="url">…</p>
-        <script src="popup.js"></script>
+
+        <section id="disconnected" hidden>
+            <p class="muted">
+                Połącz addon ze swoimi listami. Otworzy się strona Tobym z
+                jednym przyciskiem.
+            </p>
+            <label for="server">Serwer</label>
+            <select id="server"></select>
+            <button id="connect" class="primary" type="button">
+                Połącz z Tobym
+            </button>
+        </section>
+
+        <section id="connected" hidden>
+            <label for="list">Lista</label>
+            <select id="list"></select>
+            <button id="add" class="primary" type="button">
+                Dodaj tę stronę
+            </button>
+            <p id="status" class="muted" role="status"></p>
+            <div id="result" class="result" hidden>
+                <img id="result-image" alt="" />
+                <div>
+                    <strong id="result-title"></strong>
+                    <div id="result-price" class="muted"></div>
+                </div>
+            </div>
+            <p>
+                <a id="open-list" href="#" target="_blank" hidden
+                    >Otwórz listę</a
+                >
+            </p>
+            <p><a id="disconnect" href="#">Rozłącz addon</a></p>
+        </section>
+
+        <script type="module" src="popup.js"></script>
     </body>
 </html>

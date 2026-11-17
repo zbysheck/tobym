@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\LoginLinkMail;
+use App\Models\AddonToken;
 use App\Models\User;
 use App\Models\Wishlist;
 use App\Support\CurrentWishlist;
@@ -81,6 +82,11 @@ class LoginLinkController extends Controller
                 ->whereNull('user_id')
                 ->whereIn('draft_token', $draftHashes)
                 ->update(['user_id' => $user->id, 'draft_token' => null]);
+
+            // Addon połączony jeszcze ze szkicem przechodzi razem z listami na konto.
+            AddonToken::query()
+                ->whereIn('draft_hash', $draftHashes)
+                ->update(['user_id' => $user->id, 'draft_hash' => null]);
         }
 
         Cookie::queue(Cookie::forget(CurrentWishlist::COOKIE));
