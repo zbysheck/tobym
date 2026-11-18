@@ -44,3 +44,5 @@ yarn-error.log
 /opencode.jsonc
 *.swp
 *.swo
+
+/storage/logs/ship.txt
