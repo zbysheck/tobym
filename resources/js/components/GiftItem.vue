@@ -30,10 +30,20 @@ watch(
 );
 
 const rows = computed(() => props.layout === 'rows');
-// Bez zdjęcia: kafelek z nazwą sklepu zamiast pustego miejsca.
-const shopLabel = computed(() =>
-    (props.item.shop ?? '').replace(/^https?:\/\//, '').replace(/^www\./, ''),
-);
+// Nazwa sklepu jako domena ("allegro.pl"): podpis pod "Kup teraz" i kafelek bez zdjęcia.
+const shopLabel = computed(() => {
+    if (props.item.url) {
+        try {
+            return new URL(props.item.url).hostname.replace(/^www\./, '');
+        } catch {
+            // Nieprawidłowy adres: zostaje nazwa sklepu.
+        }
+    }
+
+    return (props.item.shop ?? '')
+        .replace(/^https?:\/\//, '')
+        .replace(/^www\./, '');
+});
 const editingTitle = ref(false);
 const titleField = ref<HTMLTextAreaElement | null>(null);
 const editingNote = ref(false);
@@ -160,7 +170,7 @@ function blurOnEnter(event: KeyboardEvent): void {
         :data-id="item.id"
         class="skin-outline skin-card lift group relative overflow-hidden rounded-card bg-surface shadow-card"
         :class="[
-            rows ? 'flex items-stretch' : 'flex flex-col',
+            rows ? 'flex items-stretch sm:h-36' : 'flex h-[27rem] flex-col',
             takenByOther ? 'opacity-60' : '',
             highlight ? 'flash' : '',
         ]"
@@ -192,8 +202,8 @@ function blurOnEnter(event: KeyboardEvent): void {
             class="skin-outline relative flex flex-none items-center justify-center bg-tile"
             :class="
                 rows
-                    ? 'min-h-24 w-24 border-y-0 border-l-0 sm:w-32'
-                    : 'aspect-[4/3] border-x-0 border-t-0'
+                    ? 'w-24 border-y-0 border-l-0 sm:w-36'
+                    : 'h-52 border-x-0 border-t-0'
             "
         >
             <button
@@ -243,16 +253,70 @@ function blurOnEnter(event: KeyboardEvent): void {
                     >{{ shopLabel }}</span
                 >
             </div>
+
+            <!-- Ulubiony: gwiazdka na zdjęciu (właściciel przełącza, gość widzi tylko zaznaczoną). -->
+            <button
+                v-if="editable"
+                type="button"
+                :aria-pressed="priority"
+                :aria-label="
+                    priority
+                        ? 'Bardzo chcę (kliknij, aby zdjąć)'
+                        : 'Oznacz: bardzo chcę'
+                "
+                :title="priority ? 'Bardzo chcę' : 'Oznacz: bardzo chcę'"
+                class="press absolute top-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-surface/90 shadow-card"
+                :class="[
+                    priority ? 'text-accent' : 'text-muted',
+                    starPop ? 'pop' : '',
+                ]"
+                @click="togglePriority"
+            >
+                <svg
+                    aria-hidden="true"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    :fill="priority ? 'currentColor' : 'none'"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linejoin="round"
+                >
+                    <path
+                        d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9Z"
+                    />
+                </svg>
+            </button>
+            <span
+                v-else-if="item.priority"
+                title="Bardzo chcę"
+                class="absolute top-2 right-2 flex h-8 items-center gap-1 rounded-full bg-accent px-2.5 text-xs font-semibold text-on-accent shadow-card"
+            >
+                <svg
+                    aria-hidden="true"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                >
+                    <path
+                        d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9Z"
+                    />
+                </svg>
+                <span :class="rows ? 'sr-only' : ''">Bardzo chcę</span>
+            </span>
+
+            <!-- Zmiana zdjęcia: mała ikonka w rogu. -->
             <label
                 v-if="editable"
                 :aria-label="`Zmień zdjęcie: ${item.title}`"
                 title="Zmień zdjęcie"
-                class="skin-outline press absolute right-2 bottom-2 flex h-9 cursor-pointer items-center gap-1.5 rounded-control bg-surface px-2.5 text-xs font-semibold text-ink opacity-90 focus-within:outline-2"
+                class="press absolute right-2 bottom-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-surface/90 text-ink shadow-card focus-within:outline-2"
             >
                 <svg
                     aria-hidden="true"
-                    width="16"
-                    height="16"
+                    width="15"
+                    height="15"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -262,7 +326,6 @@ function blurOnEnter(event: KeyboardEvent): void {
                     <path d="M4 8h3l2-3h6l2 3h3v11H4Z" />
                     <circle cx="12" cy="13" r="3.5" />
                 </svg>
-                <span class="hidden sm:inline">Zmień zdjęcie</span>
                 <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
@@ -273,98 +336,44 @@ function blurOnEnter(event: KeyboardEvent): void {
         </div>
 
         <div
-            class="flex min-w-0 flex-1 gap-3 p-3 sm:p-4"
-            :class="rows ? 'flex-wrap items-center' : 'flex-col'"
+            class="flex min-h-0 min-w-0 flex-1 gap-3 p-3 sm:p-4"
+            :class="rows ? 'flex-col sm:flex-row sm:items-center' : 'flex-col'"
         >
-            <div
-                class="flex min-w-0 flex-col gap-1.5"
-                :class="rows ? 'flex-[1_1_14rem]' : ''"
-            >
-                <div class="flex items-start gap-2">
-                    <div class="min-w-0 flex-1">
-                        <template v-if="editable && editingTitle">
-                            <label :for="`title-${item.id}`" class="sr-only"
-                                >Nazwa prezentu</label
-                            >
-                            <textarea
-                                :id="`title-${item.id}`"
-                                ref="titleField"
-                                :value="item.title"
-                                rows="2"
-                                maxlength="500"
-                                class="skin-display field-sizing-content w-full resize-none bg-transparent text-[17px] leading-tight text-ink sm:text-[21px]"
-                                @blur="saveTitle"
-                                @keydown.enter.prevent="blurOnEnter"
-                                @keydown.esc="editingTitle = false"
-                            ></textarea>
-                        </template>
-                        <button
-                            v-else-if="editable"
-                            type="button"
-                            :title="item.title"
-                            :aria-label="`Zmień nazwę: ${item.title}`"
-                            class="skin-display line-clamp-3 cursor-text text-left text-[17px] leading-tight text-ink sm:text-[21px]"
-                            @click="startEditingTitle"
-                        >
-                            {{ item.title }}
-                        </button>
-                        <p
-                            v-else
-                            :title="item.title"
-                            class="skin-display line-clamp-3 text-[17px] leading-tight text-ink sm:text-[21px]"
-                        >
-                            {{ item.title }}
-                        </p>
-                    </div>
-                    <button
-                        v-if="editable"
-                        type="button"
-                        :aria-pressed="priority"
-                        :aria-label="
-                            priority
-                                ? 'Bardzo chcę (kliknij, aby zdjąć)'
-                                : 'Oznacz: bardzo chcę'
-                        "
-                        :title="
-                            priority ? 'Bardzo chcę' : 'Oznacz: bardzo chcę'
-                        "
-                        class="-mt-1 -mr-2 flex h-11 w-11 flex-none items-center justify-center"
-                        :class="[
-                            priority ? 'text-accent' : 'text-muted',
-                            starPop ? 'pop' : '',
-                        ]"
-                        @click="togglePriority"
+            <!-- Tytuł i notatka pod nim. -->
+            <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-1">
+                <template v-if="editable && editingTitle">
+                    <label :for="`title-${item.id}`" class="sr-only"
+                        >Nazwa prezentu</label
                     >
-                        <svg
-                            aria-hidden="true"
-                            width="22"
-                            height="22"
-                            viewBox="0 0 24 24"
-                            :fill="priority ? 'currentColor' : 'none'"
-                            stroke="currentColor"
-                            stroke-width="1.8"
-                            stroke-linejoin="round"
-                        >
-                            <path
-                                d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9Z"
-                            />
-                        </svg>
-                    </button>
-                    <span
-                        v-else-if="item.priority"
-                        class="flex-none rounded-control bg-accent px-2 py-1 text-xs font-semibold text-on-accent"
-                        >Bardzo chcę</span
-                    >
-                </div>
-
-                <a
-                    v-if="item.url"
-                    :href="item.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="truncate text-sm text-muted underline underline-offset-4"
-                    >{{ item.shop ?? 'otwórz stronę' }}</a
+                    <textarea
+                        :id="`title-${item.id}`"
+                        ref="titleField"
+                        :value="item.title"
+                        rows="2"
+                        maxlength="500"
+                        class="skin-display w-full resize-none bg-transparent text-[17px] leading-tight text-ink sm:text-[19px]"
+                        @blur="saveTitle"
+                        @keydown.enter.prevent="blurOnEnter"
+                        @keydown.esc="editingTitle = false"
+                    ></textarea>
+                </template>
+                <button
+                    v-else-if="editable"
+                    type="button"
+                    :title="item.title"
+                    :aria-label="`Zmień nazwę: ${item.title}`"
+                    class="skin-display line-clamp-2 cursor-text text-left text-[17px] leading-tight text-ink sm:text-[19px]"
+                    @click="startEditingTitle"
                 >
+                    {{ item.title }}
+                </button>
+                <p
+                    v-else
+                    :title="item.title"
+                    class="skin-display line-clamp-2 text-[17px] leading-tight text-ink sm:text-[19px]"
+                >
+                    {{ item.title }}
+                </p>
 
                 <template v-if="editable && editingNote">
                     <label :for="`note-${item.id}`" class="sr-only"
@@ -377,7 +386,7 @@ function blurOnEnter(event: KeyboardEvent): void {
                         rows="2"
                         maxlength="2000"
                         placeholder="Rozmiar, kolor, wariant…"
-                        class="skin-outline field-sizing-content w-full resize-none rounded-control bg-surface px-2.5 py-2 text-sm text-ink placeholder:text-muted"
+                        class="skin-outline w-full resize-none rounded-control bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-muted"
                         @blur="saveNote"
                         @keydown.esc="editingNote = false"
                     ></textarea>
@@ -385,10 +394,11 @@ function blurOnEnter(event: KeyboardEvent): void {
                 <button
                     v-else-if="editable"
                     type="button"
+                    :title="item.note ?? undefined"
                     class="line-clamp-2 text-left text-sm"
                     :class="
                         item.note
-                            ? 'text-ink'
+                            ? 'text-muted'
                             : 'text-muted underline underline-offset-4'
                     "
                     @click="startEditingNote"
@@ -397,23 +407,20 @@ function blurOnEnter(event: KeyboardEvent): void {
                 </button>
                 <p
                     v-else-if="item.note"
-                    class="text-sm whitespace-pre-line text-ink"
+                    :title="item.note"
+                    class="line-clamp-2 text-sm whitespace-pre-line text-muted"
                 >
                     {{ item.note }}
                 </p>
             </div>
 
+            <!-- Właściciel: cena, sklep, usuwanie. -->
             <div
-                class="flex items-center gap-3"
-                :class="rows ? 'flex-[0_1_13rem]' : 'mt-auto justify-between'"
+                v-if="editable"
+                class="flex flex-none items-center gap-2"
+                :class="rows ? 'sm:w-64' : ''"
             >
-                <p
-                    v-if="!editable"
-                    class="min-w-0 flex-1 text-base font-semibold text-ink"
-                >
-                    {{ item.price ?? '' }}
-                </p>
-                <template v-else>
+                <div class="flex min-w-0 flex-1 flex-col">
                     <label :for="`price-${item.id}`" class="sr-only"
                         >Cena</label
                     >
@@ -423,64 +430,106 @@ function blurOnEnter(event: KeyboardEvent): void {
                         type="text"
                         :value="item.price ?? ''"
                         maxlength="64"
-                        placeholder="cena"
-                        class="h-11 min-w-0 flex-1 bg-transparent text-base font-semibold text-ink placeholder:font-normal placeholder:text-muted"
+                        placeholder="dodaj cenę"
+                        class="h-8 min-w-0 bg-transparent text-base font-semibold text-ink placeholder:font-normal placeholder:text-muted"
                         @blur="savePrice"
                         @keydown.enter="blurOnEnter"
                     />
-                    <button
-                        type="button"
-                        :aria-label="`Usuń: ${item.title}`"
-                        class="skin-outline flex h-11 w-11 flex-none items-center justify-center rounded-control bg-surface text-ink"
-                        @click="remove"
+                    <a
+                        v-if="item.url"
+                        :href="item.url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="truncate text-xs text-muted underline underline-offset-4"
+                        >na {{ shopLabel || 'stronie sklepu' }}</a
                     >
-                        <svg
-                            aria-hidden="true"
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1.8"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        >
-                            <path d="M3 6h18" />
-                            <path d="M8 6V4h8v2" />
-                            <path d="M6 6l1 14h10l1-14" />
-                        </svg>
-                    </button>
-                </template>
+                </div>
+                <button
+                    type="button"
+                    :aria-label="`Usuń: ${item.title}`"
+                    title="Usuń"
+                    class="skin-outline flex h-10 w-10 flex-none items-center justify-center rounded-control bg-surface text-ink"
+                    @click="remove"
+                >
+                    <svg
+                        aria-hidden="true"
+                        width="17"
+                        height="17"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path d="M3 6h18" />
+                        <path d="M8 6V4h8v2" />
+                        <path d="M6 6l1 14h10l1-14" />
+                    </svg>
+                </button>
             </div>
 
+            <!-- Gość: Rezerwuj + Kup teraz [cena], pod spodem "na sklep.pl". -->
             <div
-                v-if="!editable"
-                class="flex flex-wrap items-center gap-2"
-                :class="rows ? 'flex-[0_1_14rem]' : ''"
+                v-else
+                class="flex flex-none flex-col gap-1"
+                :class="rows ? 'sm:w-72' : ''"
             >
-                <button
-                    v-if="item.reservation === null"
-                    type="button"
-                    class="skin-outline h-11 flex-1 rounded-control bg-accent px-4 text-[15px] font-semibold text-on-accent"
-                    @click="emit('reserve', item)"
-                >
-                    Rezerwuję
-                </button>
-                <template v-else-if="item.reservation.mine">
-                    <p class="flex-1 text-sm font-semibold">
-                        Zarezerwowane przez Ciebie
-                    </p>
+                <div class="flex gap-2">
                     <button
+                        v-if="item.reservation === null"
                         type="button"
-                        class="h-11 px-2 text-sm text-muted underline underline-offset-4"
-                        @click="emit('unreserve', item)"
+                        class="skin-outline h-11 flex-1 rounded-control bg-accent px-3 text-[15px] font-semibold text-on-accent"
+                        @click="emit('reserve', item)"
                     >
-                        Cofnij
+                        Rezerwuj
                     </button>
-                </template>
-                <p v-else class="text-sm font-semibold">
-                    Kupuje: {{ item.reservation.name }}
-                </p>
+                    <div
+                        v-else-if="item.reservation.mine"
+                        class="flex h-11 flex-1 items-center justify-between gap-1 rounded-control bg-tile px-3 text-sm font-semibold"
+                    >
+                        <span class="truncate">Twoja rezerwacja</span>
+                        <button
+                            type="button"
+                            class="text-xs font-normal text-muted underline underline-offset-4"
+                            @click="emit('unreserve', item)"
+                        >
+                            Cofnij
+                        </button>
+                    </div>
+                    <p
+                        v-else
+                        class="flex h-11 flex-1 items-center truncate rounded-control bg-tile px-3 text-sm font-semibold"
+                    >
+                        Kupuje: {{ item.reservation.name }}
+                    </p>
+                    <a
+                        v-if="item.url && !takenByOther"
+                        :href="item.url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="skin-outline flex h-11 flex-1 items-center justify-center gap-1.5 rounded-control bg-surface px-3 text-[15px] font-semibold whitespace-nowrap text-ink"
+                    >
+                        Kup teraz
+                        <span v-if="item.price" class="opacity-70">{{
+                            item.price
+                        }}</span>
+                    </a>
+                    <p
+                        v-else-if="item.price && !item.url"
+                        class="flex h-11 items-center px-1 text-[15px] font-semibold"
+                    >
+                        {{ item.price }}
+                    </p>
+                </div>
+                <a
+                    v-if="item.url && !takenByOther"
+                    :href="item.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="self-end truncate text-xs text-muted underline underline-offset-4"
+                    >na {{ shopLabel || 'stronie sklepu' }}</a
+                >
             </div>
         </div>
     </li>

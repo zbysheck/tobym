@@ -1,23 +1,21 @@
-/** Czy w tej przeglądarce działa addon Tobym (ustawia znacznik na <html>). */
+/** Czy w tej przeglądarce działa wtyczka Tobym (ustawia znacznik na <html>). */
 export function hasAddon(): boolean {
     return document.documentElement.dataset.tobymAddon !== undefined;
 }
 
-type PageRead = {
-    type: 'tobym:page-read';
+type Reply = {
+    type: 'tobym:reply';
     id: string;
     ok?: boolean;
     html?: unknown;
+    url?: unknown;
 };
 
-/**
- * Prosi addon o odczytanie strony produktu w przeglądarce użytkownika (karta w tle).
- * Zwraca HTML albo null, gdy addonu nie ma, coś poszło nie tak lub minął czas.
- */
-export function readPageWithAddon(
-    url: string,
-    timeoutMs = 35_000,
-): Promise<string | null> {
+function ask(
+    type: string,
+    payload: Record<string, string>,
+    timeoutMs: number,
+): Promise<Reply | null> {
     if (!hasAddon()) {
         return Promise.resolve(null);
     }
@@ -27,34 +25,57 @@ export function readPageWithAddon(
     return new Promise((resolve) => {
         const timer = window.setTimeout(() => finish(null), timeoutMs);
 
-        function onMessage(event: MessageEvent<PageRead>): void {
+        function onMessage(event: MessageEvent<Reply>): void {
             if (
                 event.source !== window ||
                 event.origin !== location.origin ||
-                event.data?.type !== 'tobym:page-read' ||
+                event.data?.type !== 'tobym:reply' ||
                 event.data.id !== id
             ) {
                 return;
             }
 
-            const { ok, html } = event.data;
-            finish(
-                ok === true && typeof html === 'string' && html !== ''
-                    ? html
-                    : null,
-            );
+            finish(event.data.ok === true ? event.data : null);
         }
 
-        function finish(html: string | null): void {
+        function finish(reply: Reply | null): void {
             window.clearTimeout(timer);
             window.removeEventListener('message', onMessage);
-            resolve(html);
+            resolve(reply);
         }
 
         window.addEventListener('message', onMessage);
-        window.postMessage(
-            { type: 'tobym:read-page', id, url },
-            location.origin,
-        );
+        window.postMessage({ type, id, ...payload }, location.origin);
     });
+}
+
+/**
+ * Prosi wtyczkę o odczytanie strony produktu w przeglądarce użytkownika (karta w tle).
+ * Zwraca HTML albo null, gdy wtyczki nie ma, coś poszło nie tak lub minął czas.
+ */
+export async function readPageWithAddon(
+    url: string,
+    timeoutMs = 35_000,
+): Promise<string | null> {
+    const reply = await ask('tobym:read-page', { url }, timeoutMs);
+
+    return typeof reply?.html === 'string' && reply.html !== ''
+        ? reply.html
+        : null;
+}
+
+/** Strona zabrana kliknięciem ikony wtyczki w sklepie (adres ?dodaj=...). */
+export async function takePageFromAddon(
+    key: string,
+): Promise<{ url: string; html: string } | null> {
+    const reply = await ask('tobym:take-page', { key }, 5_000);
+
+    if (typeof reply?.url !== 'string') {
+        return null;
+    }
+
+    return {
+        url: reply.url,
+        html: typeof reply.html === 'string' ? reply.html : '',
+    };
 }

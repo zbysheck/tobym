@@ -1,10 +1,13 @@
 import { router } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { celebrate } from '@/lib/celebrate';
 import { toast } from '@/lib/ui';
-import { hasAddon, readPageWithAddon } from '@/lib/addon';
+import { hasAddon, readPageWithAddon, takePageFromAddon } from '@/lib/addon';
 import { fetchPreview, fetchPreviewFromHtml } from '@/lib/wishlist';
 import type { GiftDetails, GiftPreview } from '@/types';
+
+// Strona z ?dodaj= (kliknięcie ikony wtyczki) obsługiwana raz, nawet gdy na stronie jest kilka dodawarek.
+let addonPageHandled = false;
 
 /**
  * Wspólny przebieg dodawania prezentu: szybki podgląd, dociąganie danych w tle przez AI,
@@ -98,6 +101,53 @@ export function useGiftAdder(onAdded?: () => void) {
             blocked: false,
         };
     }
+
+    /** Prezent ze strony przysłanej przez wtyczkę (kliknięcie ikony w sklepie). */
+    async function addFromAddon(key: string): Promise<void> {
+        loading.value = true;
+        const page = await takePageFromAddon(key);
+
+        if (page === null) {
+            loading.value = false;
+            toast(
+                'Nie udało się odebrać strony od wtyczki. Kliknij ikonę jeszcze raz.',
+            );
+
+            return;
+        }
+
+        if (page.html === '') {
+            loading.value = false;
+            await addLink(page.url);
+
+            return;
+        }
+
+        const result = await fetchPreviewFromHtml(page.url, page.html);
+        loading.value = false;
+
+        if (!result.ok) {
+            toast(result.error);
+
+            return;
+        }
+
+        preview.value = result.preview;
+    }
+
+    onMounted(() => {
+        const key = new URLSearchParams(location.search).get('dodaj');
+
+        if (key === null || addonPageHandled) {
+            return;
+        }
+
+        addonPageHandled = true;
+        const url = new URL(location.href);
+        url.searchParams.delete('dodaj');
+        history.replaceState(history.state, '', url);
+        void addFromAddon(key);
+    });
 
     function addManual(): void {
         errors.value = {};
