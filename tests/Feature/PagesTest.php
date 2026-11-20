@@ -66,4 +66,12 @@ class PagesTest extends TestCase
         $this->assertDatabaseCount('users', 0);
         $this->assertDatabaseCount('wishlists', 0);
     }
+
+    public function test_the_login_page_sends_guests_a_form_and_users_to_their_lists(): void
+    {
+        $this->withoutVite();
+        $this->get(route('login'))->assertOk()->assertInertia(fn ($page) => $page->component('Login'));
+
+        $this->actingAs(User::factory()->create())->get(route('login'))->assertRedirect(route('my-lists'));
+    }
 }

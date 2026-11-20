@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import AdminBar from '@/components/AdminBar.vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import GiftCapture from '@/components/GiftCapture.vue';
 import SiteFooter from '@/components/SiteFooter.vue';
 import { allThemeFontsUrl } from '@/lib/themes';
+
+const page = usePage();
 
 defineProps<{
     listUrl: string | null;
@@ -148,6 +150,12 @@ const faq = [
                 >
                 <a href="#pytania" class="hidden text-[15px] sm:inline"
                     >Pytania</a
+                >
+                <a
+                    v-if="!page.props.auth.user"
+                    href="/logowanie"
+                    class="text-[15px] underline-offset-4 hover:underline"
+                    >Zaloguj</a
                 >
                 <a
                     :href="listUrl ?? '/start'"

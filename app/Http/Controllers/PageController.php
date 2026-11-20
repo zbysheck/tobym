@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\CurrentWishlist;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -26,6 +27,18 @@ class PageController extends Controller
             'contact' => config('tobym.privacy_contact'),
             'updated' => '17 listopada 2026',
         ])->withViewData(['indexable' => true]);
+    }
+
+    /**
+     * Logowanie linkiem z maila (bez hasła). Zalogowany trafia od razu do swoich list.
+     */
+    public function login(Request $request): Response|RedirectResponse
+    {
+        if ($request->user() !== null) {
+            return redirect()->route('my-lists');
+        }
+
+        return Inertia::render('Login');
     }
 
     private function landing(?string $listUrl): Response

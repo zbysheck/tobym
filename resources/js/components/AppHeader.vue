@@ -67,6 +67,12 @@ function logout(): void {
                 </svg>
                 Moje listy
             </a>
+            <a
+                v-if="!user"
+                href="/logowanie"
+                class="px-2 text-[15px] font-semibold underline-offset-4 hover:underline"
+                >Zaloguj</a
+            >
             <div v-if="user" ref="menu" class="relative">
                 <button
                     type="button"
